@@ -10,6 +10,21 @@ app.get("/", (req, res) => {
   res.send("API H2H RUNNING");
 });
 
+//
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: "ok",
+    service: "H2H BSI",
+    time: new Date()
+  });
+});
+//
+app.get('/inquiry', (req, res) => {
+  res.json({
+    message: "Inquiry endpoint ready"
+  });
+});
+
 // endpoint inquiry
 app.post("/inquiry", inquiry);
 
