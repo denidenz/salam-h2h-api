@@ -1,12 +1,6 @@
-const axios = require("axios");
 const crypto = require("crypto");
 
-const BASE_URL = process.env.BASE_URL;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-
-// 🔐 SIGNATURE
-function generateSignature({ method, endpoint, token, timestamp, body }) {
+function generateSignature(method, endpoint, body, token, timestamp, secret) {
   const bodyString = JSON.stringify(body);
 
   const hashedBody = crypto
@@ -15,75 +9,80 @@ function generateSignature({ method, endpoint, token, timestamp, body }) {
     .digest("hex");
 
   const stringToSign =
-    method + ":" +
-    endpoint + ":" +
-    token + ":" +
-    hashedBody + ":" +
-    timestamp;
-
-  console.log("STRING TO SIGN:", stringToSign);
+    `${method}:${endpoint}:${token}:${hashedBody}:${timestamp}`;
 
   return crypto
-    .createHmac("sha512", CLIENT_SECRET)
+    .createHmac("sha512", secret)
     .update(stringToSign)
-    .digest("hex");
+    .digest("base64");
 }
 
-// 🚀 MAIN
 module.exports = async (req, res) => {
   try {
-    const body = req.body;
+    const headers = req.headers;
 
-    if (!body.virtualAccountNo) {
-      return res.status(400).json({
-        responseCode: "4002400",
-        responseMessage: "Invalid request body",
+    const signature = headers["x-signature"];
+    const partnerId = headers["x-partner-id"];
+    const externalId = headers["x-external-id"];
+    const timestamp = headers["x-timestamp"];
+    const endpointUrl = headers["endpoint-url"];
+    const auth = headers["authorization"];
+
+    const token = auth?.split(" ")[1];
+
+    const localSignature = generateSignature(
+      "POST",
+      endpointUrl,
+      req.body,
+      token,
+      timestamp,
+      process.env.CLIENT_SECRET
+    );
+
+    if (localSignature !== signature) {
+      return res.json({
+        responseCode: "4012400",
+        responseMessage: "Verifying Signature Failed"
       });
     }
 
-    const endpoint = "/inquiry";
-    const method = "POST";
+    // ✅ TOKEN VALID (sementara)
+    if (token !== "TEST_TOKEN") {
+      return res.json({
+        responseCode: "4012401",
+        responseMessage: "Token Invalid"
+      });
+    }
 
-    const timestamp = new Date().toISOString().split(".")[0] + "Z";
+    const customerNo = req.body.customerNo;
 
-    const signature = generateSignature({
-      method,
-      endpoint,
-      token: ACCESS_TOKEN,
-      timestamp,
-      body,
+    // ✅ RESPONSE PERSIS PHP
+    return res.json({
+      responseCode: "2002400",
+      responseMessage: "Successful",
+      virtualAccountData: {
+        partnerServiceId: partnerId?.padStart(8, " "),
+        customerNo: customerNo,
+        virtualAccountNo: partnerId?.padStart(8, " ") + customerNo,
+        virtualAccountName: "TEST CUSTOMER",
+        inquiryRequestId: externalId,
+        totalAmount: {
+          value: "10000.00",
+          currency: "IDR"
+        },
+        additionalInfo: [
+          { label: "FAKULTAS", value: "TEST" },
+          { label: "KAMPUS", value: "TEST" }
+        ]
+      }
     });
 
-    console.log("=== CALL BSI ===");
-    console.log("URL:", BASE_URL + endpoint);
-    console.log("BODY:", body);
+  } catch (err) {
+    console.error(err);
 
-    const response = await axios.post(
-      BASE_URL + endpoint,
-      body,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${ACCESS_TOKEN}`,
-          "X-TIMESTAMP": timestamp,
-          "X-SIGNATURE": signature,
-        },
-        timeout: 30000,
-      }
-    );
-
-    console.log("=== RESPONSE BSI ===");
-    console.log(response.data);
-
-    return res.json(response.data);
-
-  } catch (error) {
-    console.error("=== ERROR ===");
-    console.error(error.response?.data || error.message);
-
-    return res.status(500).json({
-      message: "Inquiry failed",
-      error: error.response?.data || error.message,
+    return res.json({
+      responseCode: "5002400",
+      responseMessage: "General Error"
     });
   }
 };
