@@ -1,73 +1,81 @@
-const admin = require("firebase-admin");
+const crypto = require("crypto");
 
-if (!admin.apps.length) {
-  admin.initializeApp();
+function generateSignature(method, endpoint, body, token, timestamp, secret) {
+  const bodyString = JSON.stringify(body);
+
+  const hashedBody = crypto
+    .createHash("sha256")
+    .update(bodyString)
+    .digest("hex");
+
+  const stringToSign =
+    `${method}:${endpoint}:${token}:${hashedBody}:${timestamp}`;
+
+  return crypto
+    .createHmac("sha512", secret)
+    .update(stringToSign)
+    .digest("base64");
 }
 
-exports.paymentNotify = async (req, res) => {
+module.exports = async (req, res) => {
   try {
-    const { virtualAccountNo, paymentStatus } = req.body;
+    const headers = req.headers;
 
-    console.log("CALLBACK MASUK:", req.body);
+    const signature = headers["x-signature"];
+    const partnerId = headers["x-partner-id"];
+    const externalId = headers["x-external-id"];
+    const timestamp = headers["x-timestamp"];
+    const endpointUrl = headers["endpoint-url"];
+    const auth = headers["authorization"];
 
-    const db = admin.database();
-    const snapshot = await db.ref("tagihan").once("value");
+    const token = auth?.split(" ")[1];
 
-    let foundKey = null;
-    let foundData = null;
+    const localSignature = generateSignature(
+      "POST",
+      endpointUrl,
+      req.body,
+      token,
+      timestamp,
+      process.env.CLIENT_SECRET
+    );
 
-    snapshot.forEach((child) => {
-      const data = child.val();
+    if (localSignature !== signature) {
+      return res.json({
+        responseCode: "4012500",
+        responseMessage: "Verifying Signature Failed"
+      });
+    }
 
-      if (
-        String(data.virtualAccountNo).trim() ===
-        String(virtualAccountNo).trim()
-      ) {
-        foundKey = child.key;
-        foundData = data;
+    const paidAmount = req.body.paidAmount?.value || "10000.00";
+
+    return res.json({
+      responseCode: "2002500",
+      responseMessage: "Successful",
+      virtualAccountData: {
+        partnerServiceId: partnerId?.padStart(8, " "),
+        customerNo: req.body.customerNo,
+        virtualAccountNo: partnerId?.padStart(8, " ") + req.body.customerNo,
+        virtualAccountName: "TEST CUSTOMER",
+        paymentRequestId: externalId,
+        paidAmount: {
+          value: paidAmount,
+          currency: "IDR"
+        },
+        additionalInfo: [
+          { label: "FAKULTAS", value: "TEST" },
+          { label: "KAMPUS", value: "TEST" }
+        ],
+        billDetails: [
+          { label: "FAKULTAS", value: "TEST" },
+          { label: "KAMPUS", value: "TEST" }
+        ]
       }
     });
 
-    // ===============================
-    // JIKA DATA TIDAK ADA
-    // ===============================
-    if (!foundKey) {
-      return res.status(404).json({
-        responseCode: "4042500",
-        responseMessage: "Data tidak ditemukan",
-      });
-    }
-
-    // ===============================
-    // IDEMPOTENT (ANTI DOUBLE CALLBACK)
-    // ===============================
-    if (foundData.status === "PAID") {
-      return res.status(200).json({
-        responseCode: "2002500",
-        responseMessage: "Already Paid",
-      });
-    }
-
-    // ===============================
-    // UPDATE STATUS
-    // ===============================
-    await db.ref(`tagihan/${foundKey}`).update({
-      status: paymentStatus === "SUCCESS" ? "PAID" : "FAILED",
-      paidAt: Date.now(),
-    });
-
-    console.log("✅ STATUS UPDATED:", foundKey);
-
-    return res.status(200).json({
-      responseCode: "2002500",
-      responseMessage: "Success",
-    });
   } catch (err) {
-    console.error("ERROR:", err);
-
-    return res.status(500).json({
+    return res.json({
       responseCode: "5002500",
-      responseMessage: "General Error",
+      responseMessage: "General Error"
     });
   }
 };
