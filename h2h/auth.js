@@ -2,28 +2,42 @@ const crypto = require("crypto");
 
 module.exports = async (req, res) => {
   try {
-    const { grantType } = req.body;
+    const signature = req.headers["x-signature"];
+    const clientKey = req.headers["x-client-key"];
+    const timestamp = req.headers["x-timestamp"];
 
-    if (grantType !== "client_credentials") {
-      throw { code: 4000000, message: "Invalid Grant Type" };
+    const data = `${clientKey}.${timestamp}`;
+
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(data);
+
+    const isValid = verifier.verify(
+      process.env.BSI_PUBLIC_KEY,
+      signature,
+      "base64"
+    );
+
+    if (!isValid) {
+      return res.json({
+        responseCode: "4037300",
+        responseMessage: "Auth Error"
+      });
     }
 
-    // ✅ TOKEN STRING
-    const accessToken = crypto.randomBytes(32).toString("hex");
+    const token = "TEST_TOKEN";
 
-    console.log("GENERATED TOKEN:", accessToken);
-
-    return res.status(200).json({
-      responseCode: "2000000",
+    return res.json({
+      responseCode: "2007300",
       responseMessage: "Auth Success",
-      accessToken: accessToken,
+      accessToken: token,
       tokenType: "BearerToken",
-      expiresIn: "900",
+      expiresIn: "900"
     });
+
   } catch (err) {
-    return res.status(200).json({
-      responseCode: String(err.code || 5000000),
-      responseMessage: err.message || "Auth Error",
+    return res.json({
+      responseCode: "5007300",
+      responseMessage: "Auth Error"
     });
   }
 };
