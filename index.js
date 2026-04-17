@@ -10,6 +10,13 @@ app.get("/", (req, res) => {
   res.send("API H2H RUNNING");
 });
 
+///
+app.get("/ip", async (req, res) => {
+  const axios = require("axios");
+  const response = await axios.get("https://api.ipify.org?format=json");
+  res.json(response.data);
+});
+
 //
 app.get('/api/health', (req, res) => {
   res.json({
