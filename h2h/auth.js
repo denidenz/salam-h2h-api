@@ -7,3 +7,10 @@ module.exports = async (req, res) => {
     expiresIn: "900"
   });
 };
+
+// if (localSignature !== signature) {
+//   return res.json({
+//     responseCode: "4012400",
+//     responseMessage: "Verifying Signature Failed"
+//   });
+// }
