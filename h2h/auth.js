@@ -8,9 +8,4 @@ module.exports = async (req, res) => {
   });
 };
 
-// if (localSignature !== signature) {
-//   return res.json({
-//     responseCode: "4012400",
-//     responseMessage: "Verifying Signature Failed"
-//   });
-// }
+
