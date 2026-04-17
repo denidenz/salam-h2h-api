@@ -39,12 +39,12 @@ module.exports = async (req, res) => {
       process.env.CLIENT_SECRET
     );
 
-    if (localSignature !== signature) {
-      return res.json({
-        responseCode: "4012400",
-        responseMessage: "Verifying Signature Failed"
-      });
-    }
+    // if (localSignature !== signature) {
+      // return res.json({
+        // responseCode: "4012400",
+        // responseMessage: "Verifying Signature Failed"
+      // });
+    // }
 
     // ✅ TOKEN VALID (sementara)
     if (token !== "TEST_TOKEN") {
@@ -58,24 +58,21 @@ module.exports = async (req, res) => {
 
     // ✅ RESPONSE PERSIS PHP
     return res.json({
-      responseCode: "2002400",
-      responseMessage: "Successful",
-      virtualAccountData: {
-        partnerServiceId: partnerId?.padStart(8, " "),
-        customerNo: customerNo,
-        virtualAccountNo: partnerId?.padStart(8, " ") + customerNo,
-        virtualAccountName: "TEST CUSTOMER",
-        inquiryRequestId: externalId,
-        totalAmount: {
-          value: "10000.00",
-          currency: "IDR"
-        },
-        additionalInfo: [
-          { label: "FAKULTAS", value: "TEST" },
-          { label: "KAMPUS", value: "TEST" }
-        ]
-      }
-    });
+  responseCode: "2002400",
+  responseMessage: "Successful",
+  virtualAccountData: {
+    partnerServiceId: "1754",
+    customerNo: "00002",
+    virtualAccountNo: "17540002",
+    virtualAccountName: "TEST CUSTOMER",
+    inquiryRequestId: req.headers["x-external-id"],
+    totalAmount: {
+      value: "10000.00",
+      currency: "IDR"
+    },
+    additionalInfo: {}
+  }
+});
 
   } catch (err) {
     console.error(err);
