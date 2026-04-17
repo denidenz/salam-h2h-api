@@ -1,14 +1,20 @@
-// ================= IMPORT =================
-const functions = require("firebase-functions");
-
-// 🔹 H2H MODULES
+const express = require("express");
 const inquiry = require("./h2h/inquiry");
-const payment = require("./h2h/payment");
 
-// ================= EXPORT ENDPOINT =================
+const app = express();
 
-// ✅ INQUIRY (FlutterFlow → Firebase → BSI)
-exports.inquiry = functions.https.onRequest(inquiry.inquiry);
+app.use(express.json());
 
-// ✅ PAYMENT CALLBACK (BSI → Firebase)
-exports.paymentNotify = functions.https.onRequest(payment.paymentNotify);
+// test root
+app.get("/", (req, res) => {
+  res.send("API H2H RUNNING");
+});
+
+// endpoint inquiry
+app.post("/inquiry", inquiry);
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
