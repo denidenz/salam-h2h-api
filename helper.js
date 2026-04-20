@@ -1,5 +1,3 @@
-const crypto = require("crypto");
-
 function verifySignature(req) {
   try {
     const signature =
@@ -16,14 +14,8 @@ function verifySignature(req) {
     const endpoint = "/payment";
     const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG =====");
-    console.log("SIGNATURE:", signature);
-    console.log("TIMESTAMP:", timestamp);
-    console.log("TOKEN:", accessToken);
-    console.log("BODY:", body);
-
     if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ ADA YANG UNDEFINED");
+      console.log("❌ Missing data");
       return false;
     }
 
@@ -33,7 +25,7 @@ function verifySignature(req) {
     console.log("STRING TO SIGN:", stringToSign);
 
     const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign);
+    verifier.update(stringToSign, "utf8");
     verifier.end();
 
     const isValid = verifier.verify(
