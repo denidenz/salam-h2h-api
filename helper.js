@@ -4,7 +4,7 @@ function verifySignature({ clientKey, timestamp, signature, publicKey, body }) {
   try {
     const payload = JSON.stringify(body);
 
-    const data = `${clientKey}|${timestamp}|${payload}`;
+    const data = `${clientKey}|${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
