@@ -14,7 +14,8 @@ function verifySignature(req) {
     const authorization = req.headers["authorization"];
     const accessToken = authorization?.replace("Bearer ", "");
 
-    const bodyString = JSON.stringify(req.body);
+    // 🔥 PENTING: pakai RAW BODY (bukan JSON.stringify ulang)
+    const bodyString = req.rawBody;
 
     const stringToSign = `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
 
@@ -39,8 +40,8 @@ function verifySignature(req) {
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
-    console.log("ALL HEADERS:", req.headers);
-    console.log("BODY:", req.body);
+    console.log("HEADERS:", req.headers);
+    console.log("RAW BODY:", req.rawBody);
 
     const isValid = verifySignature(req);
 
@@ -53,12 +54,12 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ ambil data dari body
+    // ✅ ambil data
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 normalize VA → ambil customerNo
+    // 🔥 ambil customerNo dari VA
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -100,7 +101,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ update Firestore
+    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
