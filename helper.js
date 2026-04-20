@@ -1,26 +1,26 @@
 const crypto = require("crypto");
 
-function verifySignature({ req, signature, publicKey }) {
-  try {
-    const accessToken = req.headers["authorization"]?.replace("Bearer ", "");
+function verifySignature(req) {
+  const signature = req.headers["x-signature"];
+  const timestamp = req.headers["x-timestamp"];
+  const endpoint = req.headers["endpoint-url"];
+  const authorization = req.headers["authorization"];
 
-    const bodyHash = crypto
-      .createHash("sha256")
-      .update(req.rawBody)
-      .digest("hex");
+  const accessToken = authorization?.replace("Bearer ", "");
 
-    const stringToSign = `${req.method}:${req.originalUrl}:${accessToken}:${bodyHash}`;
+  const bodyString = JSON.stringify(req.body);
 
-    console.log("STRING TO SIGN:", stringToSign);
+  const stringToSign = `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
 
-    const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign);
-    verifier.end();
+  console.log("STRING TO SIGN:", stringToSign);
 
-    return verifier.verify(publicKey, signature, "base64");
+  const localSignature = crypto
+    .createHmac("sha256", process.env.CLIENT_SECRET)
+    .update(stringToSign)
+    .digest("base64");
 
-  } catch (err) {
-    console.error("VERIFY ERROR:", err);
-    return false;
-  }
+  console.log("LOCAL SIGN:", localSignature);
+  console.log("BSI SIGN :", signature);
+
+  return localSignature === signature;
 }
