@@ -4,7 +4,7 @@ const app = express();
 // ✅ HANYA INI (JANGAN DUPLIKAT)
 app.use(express.json({
   verify: (req, res, buf) => {
-    req.rawBody = buf.toString('utf8');
+    req.rawBody = buf.toString();
   }
 }));
 
