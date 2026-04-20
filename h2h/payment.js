@@ -6,29 +6,34 @@ function verifySignature(req) {
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
-    const clientKey =
-      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
-
     const timestamp =
       req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
 
-    const stringToSign = `${clientKey}|${timestamp}`;
+    const endpoint = req.headers["endpoint-url"];
 
+    const authorization =
+      req.headers["authorization"] || req.headers["bpi-authorization"];
+
+    const accessToken = authorization?.replace("Bearer ", "");
+
+    const bodyString = req.rawBody; // 🔥 WAJIB PAKAI INI
+
+    const stringToSign =
+      `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
+
+    console.log("===== SIGN DEBUG =====");
     console.log("STRING TO SIGN:", stringToSign);
+    console.log("CLIENT_SECRET:", process.env.CLIENT_SECRET);
 
-    const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign);
-    verifier.end();
+    const localSignature = crypto
+      .createHmac("sha256", process.env.CLIENT_SECRET)
+      .update(stringToSign)
+      .digest("base64");
 
-    const isValid = verifier.verify(
-      process.env.BSI_PUBLIC_KEY,
-      signature,
-      "base64"
-    );
+    console.log("LOCAL SIGN:", localSignature);
+    console.log("BSI SIGN :", signature);
 
-    console.log("SIGN VALID:", isValid);
-
-    return isValid;
+    return localSignature === signature;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -39,8 +44,12 @@ function verifySignature(req) {
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
+    console.log("HEADERS:", req.headers);
+    console.log("RAW BODY:", req.rawBody);
 
     const isValid = verifySignature(req);
+
+    console.log("SIGN VALID:", isValid);
 
     if (!isValid) {
       return res.status(401).json({
@@ -49,15 +58,22 @@ module.exports = async (req, res) => {
       });
     }
 
+    // =========================
+    // ✅ PROCESS PAYMENT
+    // =========================
+
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
+    // 🔥 NORMALISASI VA → ambil customerNo
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
+
+    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
@@ -71,6 +87,7 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
+    // 🔁 sudah bayar
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -78,6 +95,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ validasi inquiry
     if (data.lastInquiryId !== inquiryRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -85,6 +103,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ validasi nominal
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -92,6 +111,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
