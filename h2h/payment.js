@@ -1,55 +1,53 @@
-const db = require('./firebase'); // ✅ BENAR
+const db = require('./firebase');
 const { verifySignature } = require('../helper');
 
 module.exports = async (req, res) => {
   try {
-    // 🔐 HEADER
     const signature = req.headers["x-signature"];
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
 
-    // 🔐 VERIFY SIGNATURE (aktifkan saat SIT)
     const isProduction = true;
 
-    let isValid = true;
-
     if (isProduction) {
-      isValid = verifySignature({
+      const isValid = verifySignature({
         clientKey,
         timestamp,
         signature,
         publicKey: process.env.BSI_PUBLIC_KEY
       });
+
+      if (!isValid) {
+        return res.json({
+          responseCode: "4032500",
+          responseMessage: "Invalid Signature"
+        });
+      }
     }
 
-    if (!isValid) {
-      return res.json({
-        responseCode: "4032500",
-        responseMessage: "Invalid Signature"
-      });
-    }
-
-    // 🔥 BODY
     const {
       virtualAccountNo,
       inquiryRequestId,
       paidAmount
     } = req.body;
 
-    // 🔍 CEK TRANSAKSI
-    const docRef = db.collection("transactions").doc(inquiryRequestId);
-    const doc = await docRef.get();
+    const snapshot = await db
+      .collection("transactions")
+      .where("virtualAccountNo", "==", virtualAccountNo)
+      .limit(1)
+      .get();
 
-    if (!doc.exists) {
+    if (snapshot.empty) {
       return res.json({
         responseCode: "4042500",
         responseMessage: "Transaction Not Found"
       });
     }
 
+    const doc = snapshot.docs[0];
     const data = doc.data();
 
-    // 🔁 IDEMPOTENT (hindari double payment)
+    // 🔁 double payment
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -57,7 +55,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 💰 VALIDASI AMOUNT (optional tapi disarankan)
+    // 💰 validasi nominal
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -65,8 +63,8 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 UPDATE FIRESTORE
-    await docRef.update({
+    // 🔥 update firestore
+    await doc.ref.update({
       status: "PAID",
       paidAt: new Date()
     });
