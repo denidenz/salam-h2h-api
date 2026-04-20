@@ -12,10 +12,19 @@ function verifySignature(req) {
       req.headers["authorization"]?.replace("Bearer ", "") ||
       req.headers["bpi-authorization"]?.replace("Bearer ", "");
 
-    const method = req.method.toUpperCase();
-    const endpoint = "/payment";
+    const method = req.method.toUpperCase(); // POST
+    const endpoint = "/payment"; // HARUS FIX
+    const body = req.rawBody; // HARUS RAW
 
-    const body = req.rawBody;
+    if (!signature || !timestamp || !accessToken || !body) {
+      console.log("❌ DATA KURANG:", {
+        signature,
+        timestamp,
+        accessToken,
+        body
+      });
+      return false;
+    }
 
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
@@ -28,11 +37,13 @@ function verifySignature(req) {
     verifier.update(stringToSign);
     verifier.end();
 
-    return verifier.verify(
+    const isValid = verifier.verify(
       process.env.BSI_PUBLIC_KEY,
       signature,
       "base64"
     );
+
+    return isValid;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
