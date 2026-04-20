@@ -33,6 +33,8 @@ module.exports = async (req, res) => {
     }
 
     const data = doc.data();
+    const virtualAccountNo = req.body.virtualAccountNo.trim();
+    const partnerServiceId = req.body.partnerServiceId.trim();
 
     // ❌ hanya boleh UNPAID
     if (data.status !== "UNPAID") {
