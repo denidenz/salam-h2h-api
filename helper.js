@@ -2,6 +2,7 @@ const crypto = require("crypto");
 
 function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
+    // ✅ TANPA |
     const data = `${clientKey}|${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
