@@ -1,15 +1,14 @@
 const tokens = new Map();
 
 function saveToken(token) {
-  tokens.set(token, Date.now() + 900000); // 15 menit
+  tokens.set(token, Date.now() + 900000);
 }
 
 function isTokenValid(token) {
   if (!tokens.has(token)) return false;
 
-  const expired = tokens.get(token);
-
-  if (Date.now() > expired) {
+  const exp = tokens.get(token);
+  if (Date.now() > exp) {
     tokens.delete(token);
     return false;
   }
