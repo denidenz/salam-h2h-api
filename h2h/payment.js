@@ -27,6 +27,7 @@ module.exports = async (req, res) => {
     });
 
     console.log("SIGN VALID:", isValid);
+    console.log("ALL HEADERS:", req.headers);
 
     if (!isValid) {
       return res.status(401).json({
