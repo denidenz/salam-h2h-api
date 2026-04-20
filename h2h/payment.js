@@ -1,66 +1,52 @@
-const { isTokenValid } = require("../tokenStore");
-const { generateSignature, clean } = require("../helper");
+const crypto = require("crypto");
+const db = require("../firebase");
 
 module.exports = async (req, res) => {
   try {
     const signature = req.headers["x-signature"];
+    const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
-    const endpoint = req.headers["endpoint-url"];
-    const auth = req.headers["authorization"];
 
-    const token = auth?.split(" ")[1];
+    const data = `${clientKey}|${timestamp}`;
 
-    if (!isTokenValid(token)) {
-      return res.json({
-        responseCode: "4012501",
-        responseMessage: "Token Invalid"
-      });
-    }
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(data);
 
-    const localSignature = generateSignature(
-      "POST",
-      endpoint,
-      req.body,
-      token,
-      timestamp,
-      process.env.CLIENT_SECRET
+    const isValid = verifier.verify(
+      process.env.BSI_PUBLIC_KEY,
+      signature,
+      "base64"
     );
 
-    console.log("LOCAL SIGN:", localSignature);
-    console.log("BSI SIGN:", signature);
+    console.log("PAYMENT VALID:", isValid);
 
-    if (localSignature !== signature) {
+    if (!isValid) {
       return res.json({
-        responseCode: "4012500",
-        responseMessage: "Verifying Signature Failed"
+        responseCode: "4032500",
+        responseMessage: "Invalid Signature"
       });
     }
 
-    const partnerId = clean(req.body.partnerServiceId);
-    const customerNo = clean(req.body.customerNo);
-    const va = `${partnerId}${customerNo}`;
+    const { inquiryRequestId } = req.body;
+
+    // 🔥 UPDATE FIREBASE
+    await db.collection("transactions")
+      .doc(inquiryRequestId)
+      .update({
+        status: "PAID",
+        paidAt: new Date()
+      });
 
     return res.json({
       responseCode: "2002500",
-      responseMessage: "Successful",
-      virtualAccountData: {
-        partnerServiceId: partnerId,
-        customerNo: customerNo,
-        virtualAccountNo: va,
-        virtualAccountName: "TEST CUSTOMER",
-        paymentRequestId: req.headers["x-external-id"],
-        paidAmount: req.body.paidAmount,
-        additionalInfo: {},
-        billDetails: []
-      }
+      responseMessage: "Payment Success"
     });
 
   } catch (err) {
-    console.error("PAYMENT ERROR:", err);
-
+    console.error(err);
     return res.json({
       responseCode: "5002500",
-      responseMessage: "General Error"
+      responseMessage: "Payment Error"
     });
   }
 };
