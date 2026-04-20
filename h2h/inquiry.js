@@ -1,19 +1,22 @@
 const db = require('./firebase');
 
+function getExpiredTime() {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  return date.toISOString().replace('Z', '+07:00');
+}
+
 module.exports = async (req, res) => {
   try {
-    const {
-      partnerServiceId,
-      customerNo,
-      virtualAccountNo,
-      inquiryRequestId
-    } = req.body;
-
     console.log("REQ BODY:", req.body);
+
+    const virtualAccountNo = req.body.virtualAccountNo?.trim();
+    const partnerServiceId = req.body.partnerServiceId?.trim();
+    const inquiryRequestId = req.body.inquiryRequestId;
+
     console.log("VA DARI BSI:", virtualAccountNo);
 
-    // 🔥 NORMALISASI VA (ANTI DOUBLE PREFIX)
-    let cleanCustomerNo = virtualAccountNo.toString().trim();
+    // 🔥 NORMALISASI VA
+    let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
@@ -21,7 +24,6 @@ module.exports = async (req, res) => {
 
     console.log("FIXED CUSTOMER:", cleanCustomerNo);
 
-    // 🔍 AMBIL DATA DARI FIRESTORE
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -33,10 +35,7 @@ module.exports = async (req, res) => {
     }
 
     const data = doc.data();
-    const virtualAccountNo = req.body.virtualAccountNo.trim();
-    const partnerServiceId = req.body.partnerServiceId.trim();
 
-    // ❌ hanya boleh UNPAID
     if (data.status !== "UNPAID") {
       return res.json({
         responseCode: "4042400",
@@ -44,7 +43,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 SIMPAN inquiryRequestId (penting untuk payment)
+    // simpan inquiry ID
     await docRef.update({
       lastInquiryId: inquiryRequestId
     });
@@ -64,10 +63,8 @@ module.exports = async (req, res) => {
           currency: "IDR"
         },
 
-        // 🔥 WAJIB biar tidak RC81
-        expiredDateTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        expiredDateTime: getExpiredTime(),
 
-        // 🔥 WAJIB di beberapa SIT
         billDetails: [
           {
             billCode: "01",
