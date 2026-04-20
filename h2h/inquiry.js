@@ -39,11 +39,12 @@ module.exports = async (req, res) => {
       }
     });
 
-  } catch (err) {
-    console.error(err);
-    return res.json({
-      responseCode: "5002400",
-      responseMessage: "Inquiry Error"
-    });
-  }
+  } catch (error) {
+  console.error("INQUIRY ERROR:", error); // 🔥 ini penting
+
+  return res.json({
+    responseCode: "5002400",
+    responseMessage: error.message // tampilkan error asli
+  });
+}
 };
