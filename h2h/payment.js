@@ -1,39 +1,22 @@
 const db = require('./firebase');
 const crypto = require("crypto");
 
-function verifySignature(req) {
+function verifySignature({ clientKey, timestamp, signature }) {
   try {
-    const signature =
-      req.headers["x-signature"] || req.headers["bpi-signature"];
+    const stringToSign = `${clientKey}|${timestamp}`;
 
-    const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
-
-    const endpoint = req.headers["endpoint-url"];
-
-    const authorization =
-      req.headers["authorization"] || req.headers["bpi-authorization"];
-
-    const accessToken = authorization?.replace("Bearer ", "");
-
-    const bodyString = req.rawBody; // 🔥 WAJIB PAKAI INI
-
-    const stringToSign =
-      `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
-
-    console.log("===== SIGN DEBUG =====");
     console.log("STRING TO SIGN:", stringToSign);
-    console.log("CLIENT_SECRET:", process.env.CLIENT_SECRET);
+    console.log("PUBLIC KEY:", process.env.BSI_PUBLIC_KEY);
 
-    const localSignature = crypto
-      .createHmac("sha256", process.env.CLIENT_SECRET)
-      .update(stringToSign)
-      .digest("base64");
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(stringToSign);
+    verifier.end();
 
-    console.log("LOCAL SIGN:", localSignature);
-    console.log("BSI SIGN :", signature);
-
-    return localSignature === signature;
+    return verifier.verify(
+      process.env.BSI_PUBLIC_KEY,
+      signature,
+      "base64"
+    );
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -45,9 +28,30 @@ module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
     console.log("HEADERS:", req.headers);
-    console.log("RAW BODY:", req.rawBody);
 
-    const isValid = verifySignature(req);
+    const signature =
+      req.headers["x-signature"] || req.headers["bpi-signature"];
+
+    const clientKey =
+      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
+
+    const timestamp =
+      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
+
+    console.log("PARSED:", { signature, clientKey, timestamp });
+
+    if (!signature || !clientKey || !timestamp) {
+      return res.status(400).json({
+        responseCode: "4002500",
+        responseMessage: "Missing Header"
+      });
+    }
+
+    const isValid = verifySignature({
+      clientKey,
+      timestamp,
+      signature
+    });
 
     console.log("SIGN VALID:", isValid);
 
@@ -58,22 +62,21 @@ module.exports = async (req, res) => {
       });
     }
 
-    // =========================
-    // ✅ PROCESS PAYMENT
-    // =========================
+    // ======================
+    // PROCESS PAYMENT
+    // ======================
 
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 NORMALISASI VA → ambil customerNo
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
+    console.log("CUSTOMER:", cleanCustomerNo);
 
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
@@ -87,7 +90,6 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // 🔁 sudah bayar
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -95,7 +97,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ validasi inquiry
     if (data.lastInquiryId !== inquiryRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -103,7 +104,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ validasi nominal
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -111,7 +111,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
