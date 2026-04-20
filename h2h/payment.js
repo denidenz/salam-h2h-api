@@ -21,6 +21,7 @@ module.exports = async (req, res) => {
     console.log("===== PAYMENT HIT =====");
     console.log("ALL HEADERS:", req.headers);
     console.log("BODY:", req.body);
+    console.log("RAW BODY:", req.rawBody);
 
     // 🔥 FIX HEADER (BISA BPI / SNAP)
     const signature =
