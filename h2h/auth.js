@@ -1,39 +1,23 @@
 const crypto = require("crypto");
+const { saveToken } = require("../tokenStore");
 
 module.exports = async (req, res) => {
   try {
-    const signature = req.headers["x-signature"];
-    const clientKey = req.headers["x-client-key"];
-    const timestamp = req.headers["x-timestamp"];
+    const { grantType } = req.body;
 
-    if (!signature || !clientKey || !timestamp) {
+    if (grantType !== "client_credentials") {
       return res.json({
         responseCode: "4007300",
-        responseMessage: "Missing Header"
+        responseMessage: "Invalid Grant Type"
       });
     }
 
-    // 🔥 STRING YANG DI-SIGN (SAMA PERSIS DENGAN PHP)
-    const data = `${clientKey}.${timestamp}`;
-
-    const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(data);
-
-    const isValid = verifier.verify(
-      process.env.BSI_PUBLIC_KEY, // PUBLIC KEY DARI BSI
-      signature,
-      "base64"
-    );
-
-    if (!isValid) {
-      return res.json({
-        responseCode: "4037300",
-        responseMessage: "Invalid Signature"
-      });
-    }
-
-    // 🔥 GENERATE TOKEN DINAMIS
+    // 🔥 generate token dinamis
     const token = crypto.randomBytes(32).toString("hex");
+
+    saveToken(token);
+
+    console.log("TOKEN GENERATED:", token);
 
     return res.json({
       responseCode: "2007300",
