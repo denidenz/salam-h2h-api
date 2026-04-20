@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const db = require("../firebase");
+const db = require('./firebase')
 
 module.exports = async (req, res) => {
   try {
