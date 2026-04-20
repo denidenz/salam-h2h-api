@@ -6,30 +6,29 @@ function verifySignature(req) {
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
+    const clientKey =
+      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
+
     const timestamp =
       req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
 
-    const endpoint = req.headers["endpoint-url"];
-
-    const authorization = req.headers["authorization"];
-    const accessToken = authorization?.replace("Bearer ", "");
-
-    // 🔥 PENTING: pakai RAW BODY (bukan JSON.stringify ulang)
-    const bodyString = req.rawBody;
-
-    const stringToSign = `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
+    const stringToSign = `${clientKey}|${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
 
-    const localSignature = crypto
-      .createHmac("sha256", process.env.CLIENT_SECRET)
-      .update(stringToSign)
-      .digest("base64");
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(stringToSign);
+    verifier.end();
 
-    console.log("LOCAL SIGN:", localSignature);
-    console.log("BSI SIGN :", signature);
+    const isValid = verifier.verify(
+      process.env.BSI_PUBLIC_KEY,
+      signature,
+      "base64"
+    );
 
-    return localSignature === signature;
+    console.log("SIGN VALID:", isValid);
+
+    return isValid;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -40,12 +39,8 @@ function verifySignature(req) {
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
-    console.log("HEADERS:", req.headers);
-    console.log("RAW BODY:", req.rawBody);
 
     const isValid = verifySignature(req);
-
-    console.log("SIGN VALID:", isValid);
 
     if (!isValid) {
       return res.status(401).json({
@@ -54,19 +49,15 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ ambil data
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 ambil customerNo dari VA
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
-
-    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
@@ -101,7 +92,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
