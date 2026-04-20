@@ -4,11 +4,11 @@ function verifySignature(req) {
   try {
     // 🔥 BYPASS UNTUK SANDBOX / SIT
     if (process.env.IS_SANDBOX === "true") {
-      console.log("⚠️ BYPASS SIGNATURE (SANDBOX MODE)");
+      console.log("⚠️ SANDBOX MODE - BYPASS SIGNATURE");
       return true;
     }
 
-    // 🔹 Ambil header (support 2 format BSI)
+    // 🔹 Ambil header
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
@@ -22,7 +22,7 @@ function verifySignature(req) {
     const method = req.method.toUpperCase(); // POST
     const endpoint = "/payment";
 
-    // 🔥 WAJIB raw body (jangan pakai JSON.stringify(req.body))
+    // 🔥 WAJIB raw body asli (string, bukan object)
     const body = req.rawBody;
 
     console.log("===== SIGN DEBUG =====");
@@ -31,7 +31,6 @@ function verifySignature(req) {
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
 
-    // ❌ validasi awal
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
       return false;
@@ -44,8 +43,13 @@ function verifySignature(req) {
     console.log("STRING TO SIGN:", stringToSign);
     console.log("BODY LENGTH:", body.length);
 
-    // 🔐 Ambil public key dari ENV (fix newline Railway)
-    const publicKey = process.env.BSI_PUBLIC_KEY.replace(/\\n/g, "\n");
+    // 🔐 Ambil public key dari ENV
+    const publicKey = process.env.BSI_PUBLIC_KEY?.replace(/\\n/g, "\n");
+
+    if (!publicKey) {
+      console.log("❌ PUBLIC KEY NOT FOUND");
+      return false;
+    }
 
     console.log("PUBLIC KEY LOADED");
 
