@@ -42,11 +42,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const isValid = verifySignature({
-  req,
-  signature: req.headers["x-signature"],
-  publicKey: process.env.BSI_PUBLIC_KEY
-});
+    const isValid = verifySignature(req);
 
     console.log("SIGN VALID:", isValid);
 
