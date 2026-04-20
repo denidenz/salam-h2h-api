@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
-function verifySignature({ req }) {
+function verifySignature(req) {
   try {
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
