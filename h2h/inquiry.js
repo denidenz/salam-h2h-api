@@ -1,5 +1,5 @@
 const { isTokenValid } = require("../tokenStore");
-const { generateSignature } = require("../helper");
+const { generateSignature, clean } = require("../helper");
 
 module.exports = async (req, res) => {
   try {
@@ -36,13 +36,19 @@ module.exports = async (req, res) => {
       });
     }
 
+    // 🔥 CLEAN DATA (ANTI SPASI)
+    const partnerId = clean(req.body.partnerServiceId);
+    const customerNo = clean(req.body.customerNo);
+
+    const va = `${partnerId}${customerNo}`;
+
     return res.json({
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: req.body.partnerServiceId,
-        customerNo: req.body.customerNo,
-        virtualAccountNo: req.body.virtualAccountNo,
+        partnerServiceId: partnerId,
+        customerNo: customerNo,
+        virtualAccountNo: va,
         virtualAccountName: "TEST CUSTOMER",
         inquiryRequestId: req.headers["x-external-id"],
         totalAmount: {
@@ -55,6 +61,7 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("INQUIRY ERROR:", err);
+
     return res.json({
       responseCode: "5002400",
       responseMessage: "General Error"
