@@ -1,19 +1,18 @@
-const express = require("express");
-const app = express();
+const express = require('express')
+const app = express()
 
-app.use(express.json());
+app.use(express.json())
 
-const auth = require("./routes/auth");
-const inquiry = require("./routes/inquiry");
-const payment = require("./routes/payment");
+// ✅ FIX PATH
+const auth = require('./h2h/auth')
+const inquiry = require('./h2h/inquiry')
+const payment = require('./h2h/payment')
 
-app.post("/auth.php", auth);
-app.post("/inquiry.php", inquiry);
-app.post("/payment.php", payment);
+// ROUTES
+app.post('/auth.php', auth)
+app.post('/inquiry.php', inquiry)
+app.post('/payment.php', payment)
 
-app.get("/", (req, res) => {
-  res.send("H2H API RUNNING 🚀");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("RUNNING ON PORT " + PORT));
+app.listen(3000, () => {
+  console.log('H2H RUNNING 🚀')
+})
