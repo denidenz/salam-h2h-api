@@ -1,13 +1,23 @@
-const db = require('./firebase')
+const db = require('./firebase');
 
 module.exports = async (req, res) => {
   try {
+    console.log("BODY:", req.body); // debug
+
     const {
       partnerServiceId,
       customerNo,
       virtualAccountNo,
       inquiryRequestId
     } = req.body;
+
+    // 🔥 VALIDASI WAJIB
+    if (!virtualAccountNo || !inquiryRequestId) {
+      return res.json({
+        responseCode: "4002400",
+        responseMessage: "Invalid Request"
+      });
+    }
 
     const amount = 20000;
 
@@ -26,9 +36,9 @@ module.exports = async (req, res) => {
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: ` ${partnerServiceId}`,
+        partnerServiceId: partnerServiceId, // ❌ jangan pakai spasi
         customerNo,
-        virtualAccountNo: ` ${virtualAccountNo}`,
+        virtualAccountNo: virtualAccountNo, // ❌ jangan pakai spasi
         virtualAccountName: "TEST CUSTOMER",
         inquiryRequestId,
         totalAmount: {
@@ -40,11 +50,11 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-  console.error("INQUIRY ERROR:", error); // 🔥 ini penting
+    console.error("INQUIRY ERROR:", error);
 
-  return res.json({
-    responseCode: "5002400",
-    responseMessage: error.message // tampilkan error asli
-  });
-}
+    return res.json({
+      responseCode: "5002400",
+      responseMessage: error.message
+    });
+  }
 };
