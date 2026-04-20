@@ -2,7 +2,8 @@ const crypto = require("crypto");
 
 function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
-    const data = `${clientKey}|${timestamp}`;
+    // 🔥 TANPA PIPE (INI KUNCI)
+    const data = `${clientKey}${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
