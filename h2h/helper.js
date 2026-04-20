@@ -24,6 +24,7 @@ function verifySignature(req) {
     console.log("BODY:", body);
     console.log("RAW BODY EXACT:", body);
     console.log("RAW BODY HEX:", Buffer.from(body).toString("hex"));
+    console.log("URL ASLI:", req.originalUrl);
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
