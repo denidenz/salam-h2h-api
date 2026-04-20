@@ -6,11 +6,11 @@ module.exports = async (req, res) => {
     console.log("===== PAYMENT HIT =====");
     console.log("HEADERS:", req.headers);
 
-    // 🔥 WAJIB pakai rawBody untuk signature
-    const body = req.rawBody;
+    // 🔥 pastikan raw body tersedia
+    const rawBody = req.rawBody || JSON.stringify(req.body);
 
-    console.log("RAW BODY:", body);
-    console.log("RAW LENGTH:", body.length);
+    console.log("RAW BODY:", rawBody);
+    console.log("RAW LENGTH:", rawBody.length);
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
@@ -24,14 +24,14 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ambil data body (parsed JSON)
+    // ✅ ambil data body
     const {
       virtualAccountNo,
       paymentRequestId,
       paidAmount,
     } = req.body;
 
-    // ✅ bersihkan VA
+    // 🔥 bersihkan VA (hapus prefix 1754 berulang)
     let cleanCustomerNo = virtualAccountNo?.trim();
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -40,7 +40,7 @@ module.exports = async (req, res) => {
 
     console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
-    // 🔍 ambil data Firestore
+    // 🔍 ambil data dari Firestore
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -53,6 +53,7 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
+    // ✅ sudah dibayar
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -60,13 +61,22 @@ module.exports = async (req, res) => {
       });
     }
 
-    if (data.lastInquiryId !== paymentRequestId) {
+    // 🔥 VALIDASI INQUIRY (skip di sandbox)
+    if (
+      process.env.IS_SANDBOX !== "true" &&
+      data.lastInquiryId !== paymentRequestId
+    ) {
       return res.json({
         responseCode: "4002500",
         responseMessage: "Invalid Inquiry",
       });
+    } else {
+      console.log("⚠️ Inquiry check skipped / passed");
+      console.log("DB Inquiry:", data.lastInquiryId);
+      console.log("REQ Inquiry:", paymentRequestId);
     }
 
+    // ❌ validasi amount
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -74,11 +84,13 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ update
+    // ✅ update status
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
     });
+
+    console.log("✅ PAYMENT SUCCESS");
 
     return res.json({
       responseCode: "2002500",
