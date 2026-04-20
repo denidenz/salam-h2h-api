@@ -7,6 +7,9 @@ module.exports = async (req, res) => {
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
 
+    console.log("PAYMENT BODY:", req.body);
+
+    // 🔐 VERIFY SIGNATURE
     const isProduction = true;
 
     if (isProduction) {
@@ -16,6 +19,8 @@ module.exports = async (req, res) => {
         signature,
         publicKey: process.env.BSI_PUBLIC_KEY
       });
+
+      console.log("SIGN VALID:", isValid);
 
       if (!isValid) {
         return res.json({
@@ -27,13 +32,21 @@ module.exports = async (req, res) => {
 
     const {
       virtualAccountNo,
+      inquiryRequestId,
       paidAmount
     } = req.body;
 
-    // 🔥 ambil customerNo dari VA
-    const extractedCustomerNo = virtualAccountNo.substring(4);
+    // 🔥 NORMALISASI VA
+    let cleanCustomerNo = virtualAccountNo.toString().trim();
 
-    const docRef = db.collection("transactions").doc(extractedCustomerNo);
+    while (cleanCustomerNo.startsWith("1754")) {
+      cleanCustomerNo = cleanCustomerNo.substring(4);
+    }
+
+    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
+
+    // 🔍 AMBIL DATA
+    const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
     if (!doc.exists) {
@@ -45,7 +58,7 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // 🔁 double payment
+    // 🔁 CEK SUDAH BAYAR
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -53,7 +66,15 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 💰 validasi nominal
+    // ❌ VALIDASI INQUIRY ID (WAJIB)
+    if (data.lastInquiryId !== inquiryRequestId) {
+      return res.json({
+        responseCode: "4002500",
+        responseMessage: "Invalid Inquiry"
+      });
+    }
+
+    // ❌ VALIDASI NOMINAL
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -61,7 +82,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 update firestore
+    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
