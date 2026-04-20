@@ -1,9 +1,13 @@
 const crypto = require("crypto");
 
-function verifySignature({ clientKey, timestamp, signature, publicKey }) {
+function verifySignature({ clientKey, timestamp, signature, publicKey, body }) {
   try {
-    // 🔥 TANPA PIPE (INI KUNCI)
-    const data = `${clientKey}${timestamp}`;
+    // 🔥 stringify HARUS sama persis dengan BSI
+    const bodyString = JSON.stringify(body);
+
+    const data = `${clientKey}${timestamp}${bodyString}`;
+
+    console.log("SIGN STRING:", data);
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
