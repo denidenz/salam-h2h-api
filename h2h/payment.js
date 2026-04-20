@@ -36,6 +36,10 @@ module.exports = async (req, res) => {
       paidAmount
     } = req.body;
 
+
+    const virtualAccountNo = req.body.virtualAccountNo.trim();
+    const partnerServiceId = req.body.partnerServiceId.trim();
+
     // 🔥 NORMALISASI VA
     let cleanCustomerNo = virtualAccountNo.toString().trim();
 
