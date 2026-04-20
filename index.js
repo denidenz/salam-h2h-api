@@ -1,21 +1,19 @@
 const express = require("express");
-const auth = require("./h2h/auth");
-const inquiry = require("./h2h/inquiry");
-const payment = require("./h2h/payment");
-
 const app = express();
+
 app.use(express.json());
 
-// GLOBAL LOG
-app.use((req, res, next) => {
-  console.log("HIT:", req.method, req.url);
-  next();
-});
+const auth = require("./routes/auth");
+const inquiry = require("./routes/inquiry");
+const payment = require("./routes/payment");
 
 app.post("/auth.php", auth);
 app.post("/inquiry.php", inquiry);
 app.post("/payment.php", payment);
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("H2H RUNNING");
+app.get("/", (req, res) => {
+  res.send("H2H API RUNNING 🚀");
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("RUNNING ON PORT " + PORT));
