@@ -27,24 +27,22 @@ module.exports = async (req, res) => {
 
     const {
       virtualAccountNo,
-      inquiryRequestId,
       paidAmount
     } = req.body;
 
-    const snapshot = await db
-      .collection("transactions")
-      .where("virtualAccountNo", "==", virtualAccountNo)
-      .limit(1)
-      .get();
+    // 🔥 ambil customerNo dari VA
+    const extractedCustomerNo = virtualAccountNo.substring(4);
 
-    if (snapshot.empty) {
+    const docRef = db.collection("transactions").doc(extractedCustomerNo);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
       return res.json({
         responseCode: "4042500",
         responseMessage: "Transaction Not Found"
       });
     }
 
-    const doc = snapshot.docs[0];
     const data = doc.data();
 
     // 🔁 double payment
@@ -64,7 +62,7 @@ module.exports = async (req, res) => {
     }
 
     // 🔥 update firestore
-    await doc.ref.update({
+    await docRef.update({
       status: "PAID",
       paidAt: new Date()
     });
