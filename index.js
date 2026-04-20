@@ -9,6 +9,12 @@ const inquiry = require('./h2h/inquiry');
 const payment = require('./h2h/payment');
 const createTransaction = require('./h2h/createTransaction');
 
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
+
 app.post('/create-transaction', createTransaction);
 
 app.post('/auth', auth);
