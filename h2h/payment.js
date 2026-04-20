@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
   timestamp,
   signature,
   publicKey: process.env.BSI_PUBLIC_KEY,
-  body: req.body // 🔥 WAJIB
+  rawBody: req.rawBody // 🔥 WAJIB
 });
 
     console.log("SIGN VALID:", isValid);
