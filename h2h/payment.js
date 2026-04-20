@@ -11,10 +11,11 @@ module.exports = async (req, res) => {
 
     // 🔐 VERIFY SIGNATURE
     const isValid = verifySignature({
-      clientKey,
-      timestamp,
-      signature,
-      publicKey: process.env.BSI_PUBLIC_KEY
+     clientKey,
+     timestamp,
+     signature,
+     publicKey: process.env.BSI_PUBLIC_KEY,
+     body: req.body
     });
 
     console.log("SIGN VALID:", isValid);
