@@ -3,7 +3,8 @@ const crypto = require("crypto");
 function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
     // ✅ TANPA |
-    const data = `${clientKey}${timestamp}`;
+    // untuk inquiry & payment
+const data = `${clientKey}${timestamp}`; // ✅ tanpa |
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
