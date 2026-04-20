@@ -2,11 +2,7 @@ const db = require('./firebase');
 
 module.exports = async (req, res) => {
   try {
-    const {
-      customerNo,
-      name,
-      amount
-    } = req.body;
+    let { customerNo, name, amount } = req.body;
 
     // 🔍 VALIDASI INPUT
     if (!customerNo || !amount) {
@@ -16,18 +12,34 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 FORMAT VA (1754 + customerNo)
+    // 🔥 NORMALISASI customerNo (ANTI DOUBLE PREFIX)
+    customerNo = customerNo.toString().trim();
+
+    if (customerNo.startsWith("1754")) {
+      customerNo = customerNo.substring(4);
+    }
+
+    // 🔥 VALIDASI NUMERIC
+    if (!/^[0-9]+$/.test(customerNo)) {
+      return res.json({
+        success: false,
+        message: "customerNo harus angka"
+      });
+    }
+
+    // 🔥 FORMAT VA (SELALU AMAN)
     const partnerServiceId = "1754";
     const virtualAccountNo = `${partnerServiceId}${customerNo}`;
 
-    // 🔥 CEK apakah sudah ada transaksi aktif
+    console.log("CREATE VA:", virtualAccountNo);
+
+    // 🔥 CEK TRANSAKSI AKTIF
     const docRef = db.collection("transactions").doc(customerNo);
     const doc = await docRef.get();
 
     if (doc.exists) {
       const existing = doc.data();
 
-      // ❗ kalau masih unpaid, jangan overwrite (hindari duplikasi)
       if (existing.status === "UNPAID") {
         return res.json({
           success: true,
