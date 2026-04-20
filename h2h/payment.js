@@ -1,22 +1,49 @@
 const db = require('./firebase');
 const crypto = require("crypto");
 
-function verifySignature({ clientKey, timestamp, signature }) {
+function verifySignature(req) {
   try {
-    const stringToSign = `${clientKey}|${timestamp}`;
+    const signature =
+      req.headers["x-signature"] || req.headers["bpi-signature"];
+
+    const timestamp =
+      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
+
+    const accessToken =
+      req.headers["authorization"]?.replace("Bearer ", "") ||
+      req.headers["bpi-authorization"]?.replace("Bearer ", "");
+
+    const method = req.method.toUpperCase(); // POST
+    const endpoint = "/payment";
+    const body = req.rawBody;
+
+    console.log("===== SIGN DEBUG =====");
+    console.log("SIGNATURE:", signature);
+    console.log("TIMESTAMP:", timestamp);
+    console.log("TOKEN:", accessToken);
+    console.log("BODY:", body);
+
+    if (!signature || !timestamp || !accessToken || !body) {
+      console.log("❌ Missing data for signature");
+      return false;
+    }
+
+    const stringToSign =
+      `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
-    console.log("PUBLIC KEY:", process.env.BSI_PUBLIC_KEY);
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign);
     verifier.end();
 
-    return verifier.verify(
+    const isValid = verifier.verify(
       process.env.BSI_PUBLIC_KEY,
       signature,
       "base64"
     );
+
+    return isValid;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -28,24 +55,7 @@ module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
     console.log("HEADERS:", req.headers);
-
-    const signature =
-      req.headers["x-signature"] || req.headers["bpi-signature"];
-
-    const clientKey =
-      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
-
-    const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
-
-    console.log("PARSED:", { signature, clientKey, timestamp });
-
-    if (!signature || !clientKey || !timestamp) {
-      return res.status(400).json({
-        responseCode: "4002500",
-        responseMessage: "Missing Header"
-      });
-    }
+    console.log("RAW BODY:", req.rawBody);
 
     const isValid = verifySignature(req);
 
@@ -58,22 +68,21 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ======================
-    // PROCESS PAYMENT
-    // ======================
-
+    // ✅ Ambil data dari request
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
-    const inquiryRequestId = req.body.inquiryRequestId;
+    const inquiryRequestId = req.body.paymentRequestId;
     const paidAmount = req.body.paidAmount;
 
+    // 🔥 Bersihkan VA (hapus prefix 1754 berulang)
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("CUSTOMER:", cleanCustomerNo);
+    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
+    // ✅ Ambil data Firestore
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -107,12 +116,11 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ✅ Update Firestore
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
     });
-
-    console.log("🔥 FIRESTORE UPDATED");
 
     return res.json({
       responseCode: "2002500",
