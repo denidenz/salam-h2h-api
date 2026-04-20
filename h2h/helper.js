@@ -2,24 +2,22 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
-    // 🔹 Ambil header
     const signature =
-      req.headers["x-signature"] || req.headers["bpi-signature"];
+      (req.headers["x-signature"] || req.headers["bpi-signature"])?.trim();
 
     const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
+      (req.headers["x-timestamp"] || req.headers["bpi-timestamp"])?.trim();
 
     const accessToken =
-      req.headers["authorization"]?.replace("Bearer ", "") ||
-      req.headers["bpi-authorization"]?.replace("Bearer ", "");
+      req.headers["authorization"]?.replace("Bearer ", "").trim() ||
+      req.headers["bpi-authorization"]?.replace("Bearer ", "").trim();
 
-    const method = req.method.toUpperCase(); // POST
+    const method = req.method.toUpperCase();
     const endpoint = "/payment";
 
-    // 🔥 WAJIB raw body asli
-    const body = req.rawBody;
+    const body = req.rawBody || "";
 
-    console.log("===== SIGN DEBUG (HELPER) =====");
+    console.log("===== SIGN DEBUG (FINAL) =====");
     console.log("SIGNATURE:", signature);
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
@@ -30,28 +28,19 @@ function verifySignature(req) {
       return false;
     }
 
-    // 🔥 FORMAT RESMI BSI
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
     console.log("BODY LENGTH:", body.length);
 
-    // ✅ PUBLIC KEY LANGSUNG DARI ENV (SUDAH ADA HEADER)
     const publicKey = process.env.BSI_PUBLIC_KEY.replace(/\\n/g, "\n");
 
-    console.log("PUBLIC KEY CHECK:", publicKey.substring(0, 50));
-
-    // 🔐 VERIFY
     const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign);
+    verifier.update(stringToSign, "utf8");
     verifier.end();
 
-    const isValid = verifier.verify(
-      publicKey,
-      signature,
-      "base64"
-    );
+    const isValid = verifier.verify(publicKey, signature, "base64");
 
     console.log("VERIFY RESULT:", isValid);
 
