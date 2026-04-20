@@ -1,7 +1,12 @@
 const express = require('express');
 const app = express();
 
-app.use(express.json());
+// ✅ HANYA INI (JANGAN DUPLIKAT)
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 
 // 🔥 ROUTES
 const auth = require('./h2h/auth');
@@ -9,14 +14,7 @@ const inquiry = require('./h2h/inquiry');
 const payment = require('./h2h/payment');
 const createTransaction = require('./h2h/createTransaction');
 
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString('utf8');
-  }
-}));
-
 app.post('/create-transaction', createTransaction);
-
 app.post('/auth', auth);
 app.post('/inquiry', inquiry);
 app.post('/payment', payment);
