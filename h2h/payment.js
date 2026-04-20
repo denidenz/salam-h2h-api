@@ -47,11 +47,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const isValid = verifySignature({
-      clientKey,
-      timestamp,
-      signature
-    });
+    const isValid = verifySignature({ req });
 
     console.log("SIGN VALID:", isValid);
 
