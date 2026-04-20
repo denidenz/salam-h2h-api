@@ -3,45 +3,35 @@ const { verifySignature } = require('../helper');
 
 module.exports = async (req, res) => {
   try {
+    console.log("PAYMENT BODY:", req.body);
+
     const signature = req.headers["x-signature"];
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
 
-    console.log("PAYMENT BODY:", req.body);
-
     // 🔐 VERIFY SIGNATURE
-    const isProduction = true;
+    const isValid = verifySignature({
+      clientKey,
+      timestamp,
+      signature,
+      publicKey: process.env.BSI_PUBLIC_KEY
+    });
 
-    if (isProduction) {
-      const isValid = verifySignature({
-        clientKey,
-        timestamp,
-        signature,
-        publicKey: process.env.BSI_PUBLIC_KEY
+    console.log("SIGN VALID:", isValid);
+
+    if (!isValid) {
+      return res.status(401).json({
+        responseCode: "4032500",
+        responseMessage: "Invalid Signature"
       });
-
-      console.log("SIGN VALID:", isValid);
-
-      if (!isValid) {
-        return res.json({
-          responseCode: "4032500",
-          responseMessage: "Invalid Signature"
-        });
-      }
     }
 
-    const {
-      virtualAccountNo,
-      inquiryRequestId,
-      paidAmount
-    } = req.body;
-
-
-    const virtualAccountNo = req.body.virtualAccountNo.trim();
-    const partnerServiceId = req.body.partnerServiceId.trim();
+    const virtualAccountNo = req.body.virtualAccountNo?.trim();
+    const inquiryRequestId = req.body.inquiryRequestId;
+    const paidAmount = req.body.paidAmount;
 
     // 🔥 NORMALISASI VA
-    let cleanCustomerNo = virtualAccountNo.toString().trim();
+    let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
@@ -49,7 +39,6 @@ module.exports = async (req, res) => {
 
     console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
-    // 🔍 AMBIL DATA
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -62,7 +51,6 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // 🔁 CEK SUDAH BAYAR
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -70,7 +58,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ VALIDASI INQUIRY ID (WAJIB)
     if (data.lastInquiryId !== inquiryRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -78,7 +65,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ VALIDASI NOMINAL
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -86,7 +72,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
