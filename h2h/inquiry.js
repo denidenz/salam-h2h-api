@@ -9,30 +9,34 @@ module.exports = async (req, res) => {
       inquiryRequestId
     } = req.body;
 
-    // 🔍 ambil transaksi berdasarkan VA
-    const snapshot = await db
-      .collection("transactions")
-      .where("virtualAccountNo", "==", virtualAccountNo)
-      .where("status", "==", "UNPAID")
-      .limit(1)
-      .get();
+    // 🔥 ambil customerNo dari VA
+    const extractedCustomerNo = virtualAccountNo.substring(4);
 
-    if (snapshot.empty) {
+    const docRef = db.collection("transactions").doc(extractedCustomerNo);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
       return res.json({
         responseCode: "4042400",
         responseMessage: "Bill Not Found"
       });
     }
 
-    const doc = snapshot.docs[0];
     const data = doc.data();
+
+    if (data.status !== "UNPAID") {
+      return res.json({
+        responseCode: "4042400",
+        responseMessage: "Bill Not Found"
+      });
+    }
 
     return res.json({
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
         partnerServiceId,
-        customerNo,
+        customerNo: extractedCustomerNo,
         virtualAccountNo,
         virtualAccountName: data.name || "CUSTOMER",
         inquiryRequestId,
