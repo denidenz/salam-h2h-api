@@ -5,6 +5,9 @@ module.exports = async (req, res) => {
   try {
     console.log("PAYMENT BODY:", req.body);
 
+    console.log("SIGN DATA:", `${clientKey}|${timestamp}|${JSON.stringify(req.body)}`);
+    console.log("SIGNATURE:", signature);
+
     const signature = req.headers["x-signature"];
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
