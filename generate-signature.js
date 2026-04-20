@@ -8,7 +8,7 @@ const privateKey = fs.readFileSync("./private_key.pem", "utf8");
 const clientKey = "SALAM212411";
 const timestamp = "2026-04-20T11:15:00+07:00";
 
-const data = `${clientKey}|${timestamp}`;
+const data = `${clientKey}${timestamp}`;
 
 // 🔐 SIGN
 const signer = crypto.createSign("RSA-SHA256");
