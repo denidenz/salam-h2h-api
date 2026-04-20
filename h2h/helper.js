@@ -30,6 +30,7 @@ function verifySignature(req) {
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
+    console.log("IS_SANDBOX:", process.env.IS_SANDBOX);
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
