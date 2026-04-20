@@ -11,16 +11,17 @@ module.exports = async (req, res) => {
 
     console.log("VA DARI BSI:", virtualAccountNo);
 
-    // 🔥 NORMALISASI VA → ambil customerNo
-    let cleanCustomerNo = virtualAccountNo.toString();
+    // 🔥 NORMALISASI VA
+    let cleanCustomerNo = virtualAccountNo.toString().trim();
 
-    if (cleanCustomerNo.startsWith("1754")) {
+    while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("EXTRACT CUSTOMER:", cleanCustomerNo);
+    console.log("FIXED CUSTOMER:", cleanCustomerNo);
+    console.log("FIRESTORE DOC ID:", cleanCustomerNo);
 
-    // 🔍 CARI BERDASARKAN customerNo
+    // 🔍 CARI TRANSAKSI
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
