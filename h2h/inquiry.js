@@ -27,19 +27,21 @@ module.exports = async (req, res) => {
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
+    // ❌ BILL NOT FOUND
     if (!doc.exists) {
       return res.json({
-        responseCode: "2002404",
-        responseMessage: "Bill Not Found"
+        responseCode: "4042512",
+        responseMessage: "Bill not found"
       });
     }
 
     const data = doc.data();
 
+    // ❌ SUDAH TIDAK BISA DIBAYAR
     if (data.status !== "UNPAID") {
       return res.json({
-        responseCode: "2002404",
-        responseMessage: "Bill Not Found"
+        responseCode: "4042511",
+        responseMessage: "Invalid data"
       });
     }
 
@@ -48,9 +50,10 @@ module.exports = async (req, res) => {
       lastInquiryId: inquiryRequestId
     });
 
+    // ✅ SUCCESS
     return res.json({
       responseCode: "2002400",
-      responseMessage: "Successful",
+      responseMessage: "Success",
       virtualAccountData: {
         partnerServiceId,
         customerNo: cleanCustomerNo,
@@ -85,8 +88,8 @@ module.exports = async (req, res) => {
     console.error("INQUIRY ERROR:", error);
 
     return res.json({
-      responseCode: "5002400",
-      responseMessage: error.message
+      responseCode: "5002500",
+      responseMessage: "General Error"
     });
   }
 };
