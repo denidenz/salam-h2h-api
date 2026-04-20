@@ -8,7 +8,6 @@ function isTokenValid(token) {
   if (!tokens.has(token)) return false;
 
   const expired = tokens.get(token);
-
   if (Date.now() > expired) {
     tokens.delete(token);
     return false;
