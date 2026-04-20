@@ -2,7 +2,7 @@ const crypto = require("crypto");
 
 function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
-    const data = `${clientKey}${timestamp}`;
+    const data = `${clientKey}|${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
