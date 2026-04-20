@@ -1,50 +1,46 @@
 const db = require('./firebase');
-const { verifySignature } = require('../helper');
+const crypto = require("crypto");
+
+function verifySignature({ clientKey, timestamp, signature, publicKey }) {
+  try {
+    const data = `${clientKey}${timestamp}`; // 🔥 TANPA PIPE
+
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(data);
+    verifier.end();
+
+    return verifier.verify(publicKey, signature, "base64");
+  } catch (err) {
+    console.error("VERIFY ERROR:", err);
+    return false;
+  }
+}
 
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
+    console.log("ALL HEADERS:", req.headers);
+    console.log("BODY:", req.body);
 
-    // 🔍 DEBUG
-    console.log("ALL HEADERS FULL:", JSON.stringify(req.headers, null, 2));
-    console.log("PAYMENT BODY:", JSON.stringify(req.body, null, 2));
-
-    // 🔥 NORMALIZE HEADER
-    const headers = {};
-    Object.keys(req.headers).forEach(key => {
-      headers[key.toLowerCase()] = req.headers[key];
-    });
-
-    // 🔥 SUPPORT BSI (BPI HEADER)
+    // 🔥 FIX HEADER (BISA BPI / SNAP)
     const signature =
-      headers["x-signature"] ||
-      headers["bpi-signature"];
+      req.headers["x-signature"] || req.headers["bpi-signature"];
 
     const clientKey =
-      headers["x-client-key"] ||
-      headers["bpi-partner-id"];
+      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
 
     const timestamp =
-      headers["x-timestamp"] ||
-      headers["bpi-timestamp"];
+      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
 
-    console.log("PARSED HEADERS:", {
-      signature,
-      clientKey,
-      timestamp
-    });
+    console.log("PARSED HEADERS:", { signature, clientKey, timestamp });
 
-    // ❌ VALIDASI HEADER
     if (!signature || !clientKey || !timestamp) {
-      console.log("❌ HEADER TIDAK LENGKAP");
-
-      return res.json({
+      return res.status(400).json({
         responseCode: "4002500",
         responseMessage: "Missing Header"
       });
     }
 
-    // 🔐 VERIFY SIGNATURE (FORMAT BSI)
     const isValid = verifySignature({
       clientKey,
       timestamp,
@@ -55,27 +51,25 @@ module.exports = async (req, res) => {
     console.log("SIGN VALID:", isValid);
 
     if (!isValid) {
-      return res.json({
+      return res.status(401).json({
         responseCode: "4032500",
         responseMessage: "Invalid Signature"
       });
     }
 
-    // 🔥 AMBIL BODY
+    // ✅ PROCESS PAYMENT
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 NORMALISASI VA
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("CUSTOMER AFTER NORMALIZE:", cleanCustomerNo);
+    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
-    // 🔍 AMBIL DATA FIRESTORE
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -88,7 +82,6 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // 🔁 SUDAH BAYAR
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -96,7 +89,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ VALIDASI INQUIRY
     if (data.lastInquiryId !== inquiryRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -104,7 +96,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ VALIDASI NOMINAL
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -112,13 +103,10 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
     });
-
-    console.log("✅ PAYMENT SUCCESS");
 
     return res.json({
       responseCode: "2002500",
@@ -128,7 +116,7 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error("PAYMENT ERROR:", error);
 
-    return res.json({
+    return res.status(500).json({
       responseCode: "5002500",
       responseMessage: error.message
     });
