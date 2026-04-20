@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const isValid = verifySignature({ req });
+    const isValid = verifySignature(req);
 
     console.log("SIGN VALID:", isValid);
 
