@@ -7,6 +7,9 @@ app.use(express.json());
 const auth = require('./h2h/auth');
 const inquiry = require('./h2h/inquiry');
 const payment = require('./h2h/payment');
+const createTransaction = require('./h2h/createTransaction');
+
+app.post('/create-transaction', createTransaction);
 
 app.post('/auth', auth);
 app.post('/inquiry', inquiry);
