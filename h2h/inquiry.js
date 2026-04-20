@@ -9,10 +9,19 @@ module.exports = async (req, res) => {
       inquiryRequestId
     } = req.body;
 
-    // 🔥 ambil customerNo dari VA
-    const extractedCustomerNo = virtualAccountNo.substring(4);
+    console.log("VA DARI BSI:", virtualAccountNo);
 
-    const docRef = db.collection("transactions").doc(extractedCustomerNo);
+    // 🔥 NORMALISASI VA → ambil customerNo
+    let cleanCustomerNo = virtualAccountNo.toString();
+
+    if (cleanCustomerNo.startsWith("1754")) {
+      cleanCustomerNo = cleanCustomerNo.substring(4);
+    }
+
+    console.log("EXTRACT CUSTOMER:", cleanCustomerNo);
+
+    // 🔍 CARI BERDASARKAN customerNo
+    const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
     if (!doc.exists) {
@@ -36,7 +45,7 @@ module.exports = async (req, res) => {
       responseMessage: "Successful",
       virtualAccountData: {
         partnerServiceId,
-        customerNo: extractedCustomerNo,
+        customerNo: cleanCustomerNo,
         virtualAccountNo,
         virtualAccountName: data.name || "CUSTOMER",
         inquiryRequestId,
