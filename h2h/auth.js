@@ -5,9 +5,9 @@ module.exports = async (req, res) => {
   try {
     console.log("HEADERS:", req.headers);
 
-    const signature = req.headers["x-signature"];
-    const clientKey = req.headers["x-client-key"];
-    const timestamp = req.headers["x-timestamp"];
+    const signature = req.headers["bpi-signature"];
+    const clientKey = req.headers["bpi-client-key"];
+    const timestamp = req.headers["bpi-timestamp"];
 
     if (!signature || !clientKey || !timestamp) {
       return res.json({
@@ -18,7 +18,6 @@ module.exports = async (req, res) => {
 
     const data = `${clientKey}.${timestamp}`;
 
-    // 🔥 FIX PUBLIC KEY
     const publicKey = process.env.BSI_PUBLIC_KEY
       .replace(/\\n/g, "\n")
       .trim();
