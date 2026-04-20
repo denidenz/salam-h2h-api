@@ -2,48 +2,63 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
+    // 🔥 BYPASS UNTUK SANDBOX / SIT
+    if (process.env.IS_SANDBOX === "true") {
+      console.log("⚠️ BYPASS SIGNATURE (SANDBOX MODE)");
+      return true;
+    }
+
+    // 🔹 Ambil header (support 2 format BSI)
     const signature =
-      (req.headers["x-signature"] || req.headers["bpi-signature"])?.trim();
+      req.headers["x-signature"] || req.headers["bpi-signature"];
 
     const timestamp =
-      (req.headers["x-timestamp"] || req.headers["bpi-timestamp"])?.trim();
+      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
 
     const accessToken =
-      req.headers["authorization"]?.replace("Bearer ", "").trim() ||
-      req.headers["bpi-authorization"]?.replace("Bearer ", "").trim();
+      req.headers["authorization"]?.replace("Bearer ", "") ||
+      req.headers["bpi-authorization"]?.replace("Bearer ", "");
 
-    const method = req.method.toUpperCase();
+    const method = req.method.toUpperCase(); // POST
     const endpoint = "/payment";
 
-    const body = req.rawBody || "";
+    // 🔥 WAJIB raw body (jangan pakai JSON.stringify(req.body))
+    const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG (FINAL) =====");
+    console.log("===== SIGN DEBUG =====");
     console.log("SIGNATURE:", signature);
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
-    console.log("RAW BODY EXACT:", body);
-    console.log("RAW BODY HEX:", Buffer.from(body).toString("hex"));
-    console.log("URL ASLI:", req.originalUrl);
 
+    // ❌ validasi awal
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
       return false;
     }
 
+    // 🔥 FORMAT RESMI BSI
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
     console.log("BODY LENGTH:", body.length);
 
+    // 🔐 Ambil public key dari ENV (fix newline Railway)
     const publicKey = process.env.BSI_PUBLIC_KEY.replace(/\\n/g, "\n");
 
+    console.log("PUBLIC KEY LOADED");
+
+    // 🔐 VERIFY RSA SHA256
     const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign, "utf8");
+    verifier.update(stringToSign);
     verifier.end();
 
-    const isValid = verifier.verify(publicKey, signature, "base64");
+    const isValid = verifier.verify(
+      publicKey,
+      signature,
+      "base64"
+    );
 
     console.log("VERIFY RESULT:", isValid);
 
