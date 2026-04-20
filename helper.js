@@ -12,26 +12,25 @@ function verifySignature(req) {
       req.headers["authorization"]?.replace("Bearer ", "") ||
       req.headers["bpi-authorization"]?.replace("Bearer ", "");
 
-    const method = req.method.toUpperCase(); // POST
-    const endpoint = "/payment"; // HARUS FIX
-    const body = req.rawBody; // HARUS RAW
+    const method = req.method.toUpperCase();
+    const endpoint = "/payment";
+    const body = req.rawBody;
+
+    console.log("===== SIGN DEBUG =====");
+    console.log("SIGNATURE:", signature);
+    console.log("TIMESTAMP:", timestamp);
+    console.log("TOKEN:", accessToken);
+    console.log("BODY:", body);
 
     if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ DATA KURANG:", {
-        signature,
-        timestamp,
-        accessToken,
-        body
-      });
+      console.log("❌ ADA YANG UNDEFINED");
       return false;
     }
 
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
-    console.log("===== SIGN DEBUG =====");
     console.log("STRING TO SIGN:", stringToSign);
-    console.log("BSI SIGN:", signature);
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign);
