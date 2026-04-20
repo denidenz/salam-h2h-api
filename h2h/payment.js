@@ -3,56 +3,70 @@ const { verifySignature } = require('../helper');
 
 module.exports = async (req, res) => {
   try {
-    console.log("PAYMENT BODY:", req.body);
+    console.log("===== PAYMENT HIT =====");
 
-    // ✅ ambil header dulu (WAJIB di atas)
-    const signature = req.headers["x-signature"];
-    const clientKey = req.headers["x-client-key"];
-    const timestamp = req.headers["x-timestamp"];
+    // 🔥 DEBUG HEADER & BODY
+    console.log("ALL HEADERS FULL:", JSON.stringify(req.headers, null, 2));
+    console.log("PAYMENT BODY:", JSON.stringify(req.body, null, 2));
 
+    // 🔥 NORMALIZE HEADER (ANTI CASE ISSUE)
+    const headers = {};
+    Object.keys(req.headers).forEach(key => {
+      headers[key.toLowerCase()] = req.headers[key];
+    });
+
+    const signature = headers["x-signature"];
+    const clientKey = headers["x-client-key"];
+    const timestamp = headers["x-timestamp"];
+
+    console.log("PARSED HEADERS:", {
+      signature,
+      clientKey,
+      timestamp
+    });
+
+    // ❌ JANGAN PAKAI res.status → bikin RC30
     if (!signature || !clientKey || !timestamp) {
-      return res.status(400).json({
+      console.log("❌ HEADER TIDAK LENGKAP");
+
+      return res.json({
         responseCode: "4002500",
         responseMessage: "Missing Header"
       });
     }
 
-    // 🔐 verify signature
+    // 🔐 VERIFY SIGNATURE (FORMAT BSI)
     const isValid = verifySignature({
       clientKey,
       timestamp,
       signature,
-      publicKey: process.env.BSI_PUBLIC_KEY,
-      body: req.body
+      publicKey: process.env.BSI_PUBLIC_KEY
     });
 
     console.log("SIGN VALID:", isValid);
-    console.log("ALL HEADERS:", req.headers);
 
     if (!isValid) {
-      return res.status(401).json({
+      return res.json({
         responseCode: "4032500",
         responseMessage: "Invalid Signature"
       });
     }
 
-    // ✅ baru ambil body
+    // 🔥 AMBIL BODY
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 normalize VA
+    // 🔥 NORMALISASI VA (ANTI DOUBLE PREFIX)
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
-    console.log("FINAL RESPONSE: SUCCESS");
-    console.log("HEADERS:", req.headers);
-    console.log("BODY:", req.body);
+    console.log("CUSTOMER AFTER NORMALIZE:", cleanCustomerNo);
 
+    // 🔍 AMBIL DATA FIRESTORE
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -65,6 +79,7 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
+    // 🔁 CEK SUDAH BAYAR
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -72,6 +87,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ VALIDASI INQUIRY
     if (data.lastInquiryId !== inquiryRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -79,6 +95,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ VALIDASI NOMINAL
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -86,10 +103,13 @@ module.exports = async (req, res) => {
       });
     }
 
+    // 🔥 UPDATE FIRESTORE
     await docRef.update({
       status: "PAID",
       paidAt: new Date()
     });
+
+    console.log("✅ PAYMENT SUCCESS");
 
     return res.json({
       responseCode: "2002500",
@@ -99,7 +119,7 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error("PAYMENT ERROR:", error);
 
-    return res.status(500).json({
+    return res.json({
       responseCode: "5002500",
       responseMessage: error.message
     });
