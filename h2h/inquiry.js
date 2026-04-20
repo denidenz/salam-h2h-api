@@ -1,5 +1,4 @@
-const db = require('./firebase'); // ✅ BENAR
-const { verifySignature } = require('../helper');
+const db = require('./firebase');
 
 module.exports = async (req, res) => {
   try {
@@ -10,30 +9,35 @@ module.exports = async (req, res) => {
       inquiryRequestId
     } = req.body;
 
-    const amount = 20000;
+    // 🔍 ambil transaksi berdasarkan VA
+    const snapshot = await db
+      .collection("transactions")
+      .where("virtualAccountNo", "==", virtualAccountNo)
+      .where("status", "==", "UNPAID")
+      .limit(1)
+      .get();
 
-    // 🔥 SIMPAN KE FIRESTORE
-    await db.collection("transactions").doc(inquiryRequestId).set({
-      invoiceId: inquiryRequestId,
-      customerNo,
-      virtualAccountNo,
-      amount,
-      status: "UNPAID",
-      createdAt: new Date(),
-      paidAt: null
-    });
+    if (snapshot.empty) {
+      return res.json({
+        responseCode: "4042400",
+        responseMessage: "Bill Not Found"
+      });
+    }
+
+    const doc = snapshot.docs[0];
+    const data = doc.data();
 
     return res.json({
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: partnerServiceId,
+        partnerServiceId,
         customerNo,
-        virtualAccountNo: virtualAccountNo,
-        virtualAccountName: "TEST CUSTOMER",
+        virtualAccountNo,
+        virtualAccountName: data.name || "CUSTOMER",
         inquiryRequestId,
         totalAmount: {
-          value: amount.toFixed(2),
+          value: data.amount.toFixed(2),
           currency: "IDR"
         },
         additionalInfo: {}
