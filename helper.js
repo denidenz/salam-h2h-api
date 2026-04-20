@@ -1,61 +1,17 @@
 const crypto = require("crypto");
 
-/**
- * 🔐 Generate Signature BSI (HMAC SHA256)
- */
-function generateSignature({
-  method,
-  endpoint,
-  body,
-  accessToken,
-  timestamp,
-  clientSecret
-}) {
-  const stringToSign = `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
-
-  console.log("STRING TO SIGN:", stringToSign);
-
-  const signature = crypto
-    .createHmac("sha256", clientSecret)
-    .update(stringToSign)
-    .digest("base64");
-
-  console.log("GENERATED SIGN:", signature);
-
-  return signature;
-}
-
-/**
- * ✅ Verify Signature dari BSI
- */
-function verifySignature(req) {
+function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
-    const signature =
-      req.headers["x-signature"] || req.headers["bpi-signature"];
-
-    const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
-
-    const endpoint = req.headers["endpoint-url"];
-
-    const authorization = req.headers["authorization"];
-    const accessToken = authorization?.replace("Bearer ", "");
-
-    const bodyString = JSON.stringify(req.body);
-
-    const stringToSign = `${req.method}:${endpoint}:${bodyString}:${accessToken}:${timestamp}`;
+    // 🔥 FORMAT BSI PAYMENT (TANPA BODY)
+    const stringToSign = `${clientKey}|${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
 
-    const localSignature = crypto
-      .createHmac("sha256", process.env.CLIENT_SECRET)
-      .update(stringToSign)
-      .digest("base64");
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(stringToSign);
+    verifier.end();
 
-    console.log("LOCAL SIGN:", localSignature);
-    console.log("BSI SIGN :", signature);
-
-    return localSignature === signature;
+    return verifier.verify(publicKey, signature, "base64");
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -63,7 +19,4 @@ function verifySignature(req) {
   }
 }
 
-module.exports = {
-  generateSignature,
-  verifySignature
-};
+module.exports = { verifySignature };
