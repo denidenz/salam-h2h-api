@@ -8,9 +8,8 @@ function verifySignature({ clientKey, timestamp, signature, publicKey }) {
     verifier.update(data);
     verifier.end();
 
-    const isValid = verifier.verify(publicKey, signature, "base64");
+    return verifier.verify(publicKey, signature, "base64");
 
-    return isValid;
   } catch (err) {
     console.error("VERIFY ERROR:", err);
     return false;
