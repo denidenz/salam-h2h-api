@@ -24,6 +24,7 @@ function verifySignature(req) {
     console.log("BODY:", body);
     console.log("KEY LENGTH:", process.env.BSI_PUBLIC_KEY.length);
     console.log("CLIENT KEY:", clientKey);
+    console.log("CLIENT KEY:", req.headers["bpi-partner-id"]);
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing data for signature");
