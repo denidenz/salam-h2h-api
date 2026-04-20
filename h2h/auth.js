@@ -3,11 +3,9 @@ const { saveToken } = require("../tokenStore");
 
 module.exports = async (req, res) => {
   try {
-    console.log("HEADERS:", req.headers);
-
-    const signature = req.headers["bpi-signature"];
-    const clientKey = req.headers["bpi-client-key"];
-    const timestamp = req.headers["bpi-timestamp"];
+    const signature = req.headers["x-signature"];
+    const clientKey = req.headers["x-client-key"];
+    const timestamp = req.headers["x-timestamp"];
 
     if (!signature || !clientKey || !timestamp) {
       return res.json({
@@ -18,18 +16,16 @@ module.exports = async (req, res) => {
 
     const data = `${clientKey}|${timestamp}`;
 
-    const publicKey = process.env.BSI_PUBLIC_KEY
-      .replace(/\\n/g, "\n")
-      .trim();
-
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
-    verifier.end();
 
-    const isValid = verifier.verify(publicKey, signature, "base64");
+    const isValid = verifier.verify(
+      process.env.BSI_PUBLIC_KEY,
+      signature,
+      "base64"
+    );
 
-    console.log("DATA:", data);
-    console.log("VALID:", isValid);
+    console.log("AUTH VALID:", isValid);
 
     if (!isValid) {
       return res.json({
@@ -50,8 +46,7 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("AUTH ERROR:", err);
-
+    console.error(err);
     return res.json({
       responseCode: "5007300",
       responseMessage: "Auth Error"
