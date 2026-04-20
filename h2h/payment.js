@@ -6,6 +6,8 @@ module.exports = async (req, res) => {
     console.log("===== PAYMENT HIT =====");
     console.log("HEADERS:", req.headers);
     console.log("RAW BODY:", JSON.stringify(req.body));
+    console.log("RAW LENGTH:", body.length);
+console.log("RAW EXACT:", JSON.stringify(body));
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
