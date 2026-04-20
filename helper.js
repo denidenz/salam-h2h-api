@@ -1,26 +1,20 @@
 const crypto = require("crypto");
 
-// 🔥 CLEAN STRING (FIX SPASI)
-function clean(val) {
-  return String(val || "").trim();
+function verifySignature({ clientKey, timestamp, signature, publicKey }) {
+  try {
+    const data = `${clientKey}${timestamp}`;
+
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(data);
+    verifier.end();
+
+    const isValid = verifier.verify(publicKey, signature, "base64");
+
+    return isValid;
+  } catch (err) {
+    console.error("VERIFY ERROR:", err);
+    return false;
+  }
 }
 
-// 🔐 HMAC SIGNATURE
-function generateSignature(method, endpoint, body, token, timestamp, secret) {
-  const bodyString = JSON.stringify(body);
-
-  const hashedBody = crypto
-    .createHash("sha256")
-    .update(bodyString)
-    .digest("hex");
-
-  const stringToSign =
-    `${method}:${endpoint}:${token}:${hashedBody}:${timestamp}`;
-
-  return crypto
-    .createHmac("sha512", secret)
-    .update(stringToSign)
-    .digest("base64");
-}
-
-module.exports = { generateSignature, clean };
+module.exports = { verifySignature };
