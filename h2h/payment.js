@@ -1,11 +1,14 @@
 const { isTokenValid } = require("../tokenStore");
+const { generateSignature } = require("../helper");
 
 module.exports = async (req, res) => {
   try {
+    const signature = req.headers["x-signature"];
+    const timestamp = req.headers["x-timestamp"];
+    const endpoint = req.headers["endpoint-url"];
     const auth = req.headers["authorization"];
-    const token = auth?.split(" ")[1];
 
-    console.log("PAYMENT TOKEN:", token);
+    const token = auth?.split(" ")[1];
 
     if (!isTokenValid(token)) {
       return res.json({
@@ -14,17 +17,22 @@ module.exports = async (req, res) => {
       });
     }
 
-    const body = req.body;
+    const localSignature = generateSignature(
+      "POST",
+      endpoint,
+      req.body,
+      token,
+      timestamp,
+      process.env.CLIENT_SECRET
+    );
 
-    console.log("PAYMENT BODY:", body);
+    console.log("LOCAL SIGN:", localSignature);
+    console.log("BSI SIGN:", signature);
 
-    const paidAmount = body.paidAmount?.value || "0";
-
-    // 🔥 VALIDASI NOMINAL (contoh)
-    if (paidAmount !== "20000.00") {
+    if (localSignature !== signature) {
       return res.json({
-        responseCode: "4042513",
-        responseMessage: "Payment Amount not valid"
+        responseCode: "4012500",
+        responseMessage: "Verifying Signature Failed"
       });
     }
 
@@ -32,15 +40,12 @@ module.exports = async (req, res) => {
       responseCode: "2002500",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: body.partnerServiceId,
-        customerNo: body.customerNo,
-        virtualAccountNo: body.virtualAccountNo,
+        partnerServiceId: req.body.partnerServiceId,
+        customerNo: req.body.customerNo,
+        virtualAccountNo: req.body.virtualAccountNo,
         virtualAccountName: "TEST CUSTOMER",
         paymentRequestId: req.headers["x-external-id"],
-        paidAmount: {
-          value: paidAmount,
-          currency: "IDR"
-        },
+        paidAmount: req.body.paidAmount,
         additionalInfo: {},
         billDetails: []
       }
@@ -48,7 +53,6 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("PAYMENT ERROR:", err);
-
     return res.json({
       responseCode: "5002500",
       responseMessage: "General Error"
