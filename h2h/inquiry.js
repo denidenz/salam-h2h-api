@@ -2,8 +2,6 @@ const db = require('./firebase');
 
 module.exports = async (req, res) => {
   try {
-    console.log("BODY:", req.body); // debug
-
     const {
       partnerServiceId,
       customerNo,
@@ -11,17 +9,9 @@ module.exports = async (req, res) => {
       inquiryRequestId
     } = req.body;
 
-    // 🔥 VALIDASI WAJIB
-    if (!virtualAccountNo || !inquiryRequestId) {
-      return res.json({
-        responseCode: "4002400",
-        responseMessage: "Invalid Request"
-      });
-    }
-
     const amount = 20000;
 
-    // 🔥 SIMPAN KE FIREBASE
+    // 🔥 SIMPAN KE FIRESTORE
     await db.collection("transactions").doc(inquiryRequestId).set({
       invoiceId: inquiryRequestId,
       customerNo,
@@ -36,9 +26,9 @@ module.exports = async (req, res) => {
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: partnerServiceId, // ❌ jangan pakai spasi
+        partnerServiceId: ` ${partnerServiceId}`,
         customerNo,
-        virtualAccountNo: virtualAccountNo, // ❌ jangan pakai spasi
+        virtualAccountNo: ` ${virtualAccountNo}`,
         virtualAccountName: "TEST CUSTOMER",
         inquiryRequestId,
         totalAmount: {
