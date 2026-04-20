@@ -2,6 +2,7 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
+    // 🔹 Ambil header
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
@@ -14,34 +15,45 @@ function verifySignature(req) {
 
     const method = req.method.toUpperCase(); // POST
     const endpoint = "/payment";
+
+    // 🔥 WAJIB raw body asli
     const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG =====");
+    console.log("===== SIGN DEBUG (HELPER) =====");
     console.log("SIGNATURE:", signature);
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
 
     if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ Missing data for signature");
+      console.log("❌ Missing required data");
       return false;
     }
 
-    // ✅ FORMAT BENAR
+    // 🔥 FORMAT RESMI BSI
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
+    console.log("BODY LENGTH:", body.length);
 
+    // ✅ PUBLIC KEY LANGSUNG DARI ENV (SUDAH ADA HEADER)
+    const publicKey = process.env.BSI_PUBLIC_KEY.replace(/\\n/g, "\n");
+
+    console.log("PUBLIC KEY CHECK:", publicKey.substring(0, 50));
+
+    // 🔐 VERIFY
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign);
     verifier.end();
 
     const isValid = verifier.verify(
-      process.env.BSI_PUBLIC_KEY,
+      publicKey,
       signature,
       "base64"
     );
+
+    console.log("VERIFY RESULT:", isValid);
 
     return isValid;
 
@@ -51,4 +63,6 @@ function verifySignature(req) {
   }
 }
 
-module.exports = { verifySignature };
+module.exports = {
+  verifySignature
+};
