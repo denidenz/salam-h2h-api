@@ -1,4 +1,4 @@
-const db = require('../firebase');
+const db = require('./firebase');
 const { verifySignature } = require('../helper');
 
 module.exports = async (req, res) => {
