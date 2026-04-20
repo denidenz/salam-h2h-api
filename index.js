@@ -6,7 +6,7 @@ const payment = require("./h2h/payment");
 const app = express();
 app.use(express.json());
 
-// debug log
+// DEBUG GLOBAL
 app.use((req, res, next) => {
   console.log("HIT:", req.method, req.url);
   next();
