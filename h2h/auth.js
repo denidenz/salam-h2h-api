@@ -19,8 +19,8 @@ module.exports = async (req, res) => {
     const data = `${clientKey}|${timestamp}`;
 
     const publicKey = process.env.BSI_PUBLIC_KEY
-     .replace(/\\n/g, "\n")
-     .trim();
+      .replace(/\\n/g, "\n")
+      .trim();
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
@@ -29,13 +29,6 @@ module.exports = async (req, res) => {
     const isValid = verifier.verify(publicKey, signature, "base64");
 
     console.log("DATA:", data);
-    console.log("VALID:", isValid);
-    console.log("=== AUTH DEBUG ===");
-    console.log("CLIENT KEY:", clientKey);
-    console.log("TIMESTAMP:", timestamp);
-    console.log("DATA:", data);
-    console.log("SIGNATURE:", signature);
-    console.log("PUBLIC KEY:", publicKey.slice(0, 50) + "...");
     console.log("VALID:", isValid);
 
     if (!isValid) {
@@ -58,6 +51,7 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("AUTH ERROR:", err);
+
     return res.json({
       responseCode: "5007300",
       responseMessage: "Auth Error"
