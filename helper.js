@@ -16,6 +16,10 @@ function verifySignature(req) {
       return false;
     }
 
+    console.log("CLIENT KEY:", clientKey);
+    console.log("TIMESTAMP:", timestamp);
+    console.log("SIGNATURE:", signature);
+
     const stringToSign = `${clientKey}|${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
