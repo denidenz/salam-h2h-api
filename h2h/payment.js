@@ -4,97 +4,82 @@ const { verifySignature } = require("./helper");
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
-    console.log("HEADERS:", req.headers);
-
-    // 🔥 pastikan raw body tersedia
-    const rawBody = req.rawBody || JSON.stringify(req.body);
-
-    console.log("RAW BODY:", rawBody);
-    console.log("RAW LENGTH:", rawBody.length);
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
 
-    console.log("SIGN VALID:", isValid);
-
     if (!isValid) {
       return res.status(401).json({
-        responseCode: "4032500",
-        responseMessage: "Invalid Signature",
+        responseCode: "4012500",
+        responseMessage: "Unauthorized Access",
       });
     }
 
-    // ✅ ambil data body
     const {
       virtualAccountNo,
       paymentRequestId,
       paidAmount,
     } = req.body;
 
-    // 🔥 bersihkan VA (hapus prefix 1754 berulang)
-    let cleanCustomerNo = virtualAccountNo?.trim();
+    // 🔧 bersihkan VA
+    let customerNo = virtualAccountNo?.trim();
 
-    while (cleanCustomerNo.startsWith("1754")) {
-      cleanCustomerNo = cleanCustomerNo.substring(4);
+    while (customerNo.startsWith("1754")) {
+      customerNo = customerNo.substring(4);
     }
 
-    console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
+    console.log("CUSTOMER:", customerNo);
 
-    // 🔍 ambil data dari Firestore
-    const docRef = db.collection("transactions").doc(cleanCustomerNo);
+    // 🔍 ambil data
+    const docRef = db.collection("transactions").doc(customerNo);
     const doc = await docRef.get();
 
+    // ❌ BILL NOT FOUND
     if (!doc.exists) {
       return res.json({
-        responseCode: "4042500",
-        responseMessage: "Transaction Not Found",
+        responseCode: "4042512",
+        responseMessage: "Bill not found",
       });
     }
 
     const data = doc.data();
 
-    // ✅ sudah dibayar
+    // ❌ SUDAH DIBAYAR
     if (data.status === "PAID") {
       return res.json({
-        responseCode: "2002500",
-        responseMessage: "Already Paid",
+        responseCode: "4042514",
+        responseMessage: "Bill already paid",
       });
     }
 
-    // 🔥 VALIDASI INQUIRY (skip di sandbox)
+    // ❌ INVALID INQUIRY (pakai INVALID DATA)
     if (
       process.env.IS_SANDBOX !== "true" &&
       data.lastInquiryId !== paymentRequestId
     ) {
       return res.json({
-        responseCode: "4002500",
-        responseMessage: "Invalid Inquiry",
+        responseCode: "4042511",
+        responseMessage: "Invalid data",
       });
-    } else {
-      console.log("⚠️ Inquiry check skipped / passed");
-      console.log("DB Inquiry:", data.lastInquiryId);
-      console.log("REQ Inquiry:", paymentRequestId);
     }
 
-    // ❌ validasi amount
+    // ❌ INVALID AMOUNT
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
-        responseCode: "4002500",
-        responseMessage: "Invalid Amount",
+        responseCode: "4042513",
+        responseMessage: "Payment Amount not valid",
       });
     }
 
-    // ✅ update status
+    // ✅ SUCCESS
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
     });
 
-    console.log("✅ PAYMENT SUCCESS");
-
     return res.json({
       responseCode: "2002500",
-      responseMessage: "Successful",
+      responseMessage: "Success",
     });
 
   } catch (error) {
@@ -102,7 +87,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       responseCode: "5002500",
-      responseMessage: error.message,
+      responseMessage: "General Error",
     });
   }
 };
