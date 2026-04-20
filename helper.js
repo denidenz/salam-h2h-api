@@ -3,24 +3,20 @@ function verifySignature(req) {
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
+    const clientKey =
+      req.headers["x-client-key"] ||
+      req.headers["bpi-partner-id"];
+
     const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
+      req.headers["x-timestamp"] ||
+      req.headers["bpi-timestamp"];
 
-    const accessToken =
-      req.headers["authorization"]?.replace("Bearer ", "") ||
-      req.headers["bpi-authorization"]?.replace("Bearer ", "");
-
-    const method = req.method.toUpperCase();
-    const endpoint = "/payment";
-    const body = req.rawBody;
-
-    if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ Missing data");
+    if (!signature || !clientKey || !timestamp) {
+      console.log("❌ Missing header");
       return false;
     }
 
-    const stringToSign =
-      `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
+    const stringToSign = `${clientKey}|${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
 
