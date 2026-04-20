@@ -5,20 +5,25 @@ module.exports = async (req, res) => {
   try {
     console.log("PAYMENT BODY:", req.body);
 
-    console.log("SIGN DATA:", `${clientKey}|${timestamp}|${JSON.stringify(req.body)}`);
-    console.log("SIGNATURE:", signature);
-
+    // ✅ ambil header dulu (WAJIB di atas)
     const signature = req.headers["x-signature"];
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
 
-    // 🔐 VERIFY SIGNATURE
+    if (!signature || !clientKey || !timestamp) {
+      return res.status(400).json({
+        responseCode: "4002500",
+        responseMessage: "Missing Header"
+      });
+    }
+
+    // 🔐 verify signature
     const isValid = verifySignature({
-     clientKey,
-     timestamp,
-     signature,
-     publicKey: process.env.BSI_PUBLIC_KEY,
-     body: req.body
+      clientKey,
+      timestamp,
+      signature,
+      publicKey: process.env.BSI_PUBLIC_KEY,
+      body: req.body
     });
 
     console.log("SIGN VALID:", isValid);
@@ -30,11 +35,12 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ✅ baru ambil body
     const virtualAccountNo = req.body.virtualAccountNo?.trim();
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 NORMALISASI VA
+    // 🔥 normalize VA
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -89,7 +95,7 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error("PAYMENT ERROR:", error);
 
-    return res.json({
+    return res.status(500).json({
       responseCode: "5002500",
       responseMessage: error.message
     });
