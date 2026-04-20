@@ -26,9 +26,9 @@ module.exports = async (req, res) => {
       responseCode: "2002400",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: ` ${partnerServiceId}`,
+        partnerServiceId: partnerServiceId,
         customerNo,
-        virtualAccountNo: ` ${virtualAccountNo}`,
+        virtualAccountNo: virtualAccountNo,
         virtualAccountName: "TEST CUSTOMER",
         inquiryRequestId,
         totalAmount: {
