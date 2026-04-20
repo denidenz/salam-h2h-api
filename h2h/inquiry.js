@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
 
     if (!doc.exists) {
       return res.json({
-        responseCode: "4042400",
+        responseCode: "2002404",
         responseMessage: "Bill Not Found"
       });
     }
@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
 
     if (data.status !== "UNPAID") {
       return res.json({
-        responseCode: "4042400",
+        responseCode: "2002404",
         responseMessage: "Bill Not Found"
       });
     }
