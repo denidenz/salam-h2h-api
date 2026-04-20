@@ -22,6 +22,7 @@ function verifySignature(req) {
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
+    console.log("KEY LENGTH:", process.env.BSI_PUBLIC_KEY.length);
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing data for signature");
