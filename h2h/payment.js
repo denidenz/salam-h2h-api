@@ -1,78 +1,54 @@
-const crypto = require("crypto");
-
-function generateSignature(method, endpoint, body, token, timestamp, secret) {
-  const bodyString = JSON.stringify(body);
-
-  const hashedBody = crypto
-    .createHash("sha256")
-    .update(bodyString)
-    .digest("hex");
-
-  const stringToSign =
-    `${method}:${endpoint}:${token}:${hashedBody}:${timestamp}`;
-
-  return crypto
-    .createHmac("sha512", secret)
-    .update(stringToSign)
-    .digest("base64");
-}
+const { isTokenValid } = require("../tokenStore");
 
 module.exports = async (req, res) => {
   try {
-    const headers = req.headers;
-
-    const signature = headers["x-signature"];
-    const partnerId = headers["x-partner-id"];
-    const externalId = headers["x-external-id"];
-    const timestamp = headers["x-timestamp"];
-    const endpointUrl = headers["endpoint-url"];
-    const auth = headers["authorization"];
-
+    const auth = req.headers["authorization"];
     const token = auth?.split(" ")[1];
 
-    const localSignature = generateSignature(
-      "POST",
-      endpointUrl,
-      req.body,
-      token,
-      timestamp,
-      process.env.CLIENT_SECRET
-    );
+    console.log("PAYMENT TOKEN:", token);
 
-    if (localSignature !== signature) {
+    if (!isTokenValid(token)) {
       return res.json({
-        responseCode: "4012500",
-        responseMessage: "Verifying Signature Failed"
+        responseCode: "4012501",
+        responseMessage: "Token Invalid"
       });
     }
 
-    const paidAmount = req.body.paidAmount?.value || "10000.00";
+    const body = req.body;
+
+    console.log("PAYMENT BODY:", body);
+
+    const paidAmount = body.paidAmount?.value || "0";
+
+    // 🔥 VALIDASI NOMINAL (contoh)
+    if (paidAmount !== "20000.00") {
+      return res.json({
+        responseCode: "4042513",
+        responseMessage: "Payment Amount not valid"
+      });
+    }
 
     return res.json({
       responseCode: "2002500",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: partnerId?.padStart(8, " "),
-        customerNo: req.body.customerNo,
-        virtualAccountNo: partnerId?.padStart(8, " ") + req.body.customerNo,
+        partnerServiceId: body.partnerServiceId,
+        customerNo: body.customerNo,
+        virtualAccountNo: body.virtualAccountNo,
         virtualAccountName: "TEST CUSTOMER",
-        paymentRequestId: externalId,
+        paymentRequestId: req.headers["x-external-id"],
         paidAmount: {
           value: paidAmount,
           currency: "IDR"
         },
-        additionalInfo: [
-          { label: "FAKULTAS", value: "TEST" },
-          { label: "KAMPUS", value: "TEST" }
-        ],
-        billDetails: [
-          { label: "FAKULTAS", value: "TEST" },
-          { label: "KAMPUS", value: "TEST" }
-        ]
+        additionalInfo: {},
+        billDetails: []
       }
     });
 
   } catch (err) {
+    console.error("PAYMENT ERROR:", err);
+
     return res.json({
       responseCode: "5002500",
       responseMessage: "General Error"
