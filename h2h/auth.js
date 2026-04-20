@@ -30,6 +30,13 @@ module.exports = async (req, res) => {
 
     console.log("DATA:", data);
     console.log("VALID:", isValid);
+    console.log("=== AUTH DEBUG ===");
+console.log("CLIENT KEY:", clientKey);
+console.log("TIMESTAMP:", timestamp);
+console.log("DATA:", data);
+console.log("SIGNATURE:", signature);
+console.log("PUBLIC KEY:", publicKey.slice(0, 50) + "...");
+console.log("VALID:", isValid);
 
     if (!isValid) {
       return res.json({
