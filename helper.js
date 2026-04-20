@@ -1,5 +1,8 @@
+const crypto = require("crypto");
+
 function verifySignature(req) {
   try {
+    // ambil dari header
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
@@ -11,19 +14,17 @@ function verifySignature(req) {
       req.headers["x-timestamp"] ||
       req.headers["bpi-timestamp"];
 
-    if (!signature || !clientKey || !timestamp) {
-      console.log("❌ Missing header");
-      return false;
-    }
-
+    console.log("SIGNATURE:", signature);
     console.log("CLIENT KEY:", clientKey);
     console.log("TIMESTAMP:", timestamp);
 
+    if (!signature || !clientKey || !timestamp) {
+      console.log("❌ Header tidak lengkap");
+      return false;
+    }
+
     const stringToSign = `${clientKey}|${timestamp}`;
-
     console.log("STRING TO SIGN:", stringToSign);
-
-    const crypto = require("crypto");
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign, "utf8");
@@ -42,3 +43,5 @@ function verifySignature(req) {
     return false;
   }
 }
+
+module.exports = verifySignature;
