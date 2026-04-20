@@ -1,5 +1,5 @@
 const { isTokenValid } = require("../tokenStore");
-const { generateSignature } = require("../helper");
+const { generateSignature, clean } = require("../helper");
 
 module.exports = async (req, res) => {
   try {
@@ -36,13 +36,17 @@ module.exports = async (req, res) => {
       });
     }
 
+    const partnerId = clean(req.body.partnerServiceId);
+    const customerNo = clean(req.body.customerNo);
+    const va = `${partnerId}${customerNo}`;
+
     return res.json({
       responseCode: "2002500",
       responseMessage: "Successful",
       virtualAccountData: {
-        partnerServiceId: req.body.partnerServiceId,
-        customerNo: req.body.customerNo,
-        virtualAccountNo: req.body.virtualAccountNo,
+        partnerServiceId: partnerId,
+        customerNo: customerNo,
+        virtualAccountNo: va,
         virtualAccountName: "TEST CUSTOMER",
         paymentRequestId: req.headers["x-external-id"],
         paidAmount: req.body.paidAmount,
@@ -53,6 +57,7 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("PAYMENT ERROR:", err);
+
     return res.json({
       responseCode: "5002500",
       responseMessage: "General Error"
