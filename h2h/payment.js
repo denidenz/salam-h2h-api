@@ -5,12 +5,17 @@ module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
     console.log("HEADERS:", req.headers);
-    console.log("RAW BODY:", JSON.stringify(req.body));
+
+    // 🔥 WAJIB pakai rawBody untuk signature
+    const body = req.rawBody;
+
+    console.log("RAW BODY:", body);
     console.log("RAW LENGTH:", body.length);
-console.log("RAW EXACT:", JSON.stringify(body));
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
+
+    console.log("SIGN VALID:", isValid);
 
     if (!isValid) {
       return res.status(401).json({
@@ -19,14 +24,14 @@ console.log("RAW EXACT:", JSON.stringify(body));
       });
     }
 
-    // ambil data body
+    // ambil data body (parsed JSON)
     const {
       virtualAccountNo,
       paymentRequestId,
       paidAmount,
     } = req.body;
 
-    // ✅ bersihkan VA (hapus prefix 1754 berulang)
+    // ✅ bersihkan VA
     let cleanCustomerNo = virtualAccountNo?.trim();
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -35,7 +40,7 @@ console.log("RAW EXACT:", JSON.stringify(body));
 
     console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
 
-    // 🔍 ambil data dari Firestore
+    // 🔍 ambil data Firestore
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
@@ -48,7 +53,6 @@ console.log("RAW EXACT:", JSON.stringify(body));
 
     const data = doc.data();
 
-    // ✅ sudah dibayar
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
@@ -56,7 +60,6 @@ console.log("RAW EXACT:", JSON.stringify(body));
       });
     }
 
-    // ❌ validasi inquiry ID
     if (data.lastInquiryId !== paymentRequestId) {
       return res.json({
         responseCode: "4002500",
@@ -64,7 +67,6 @@ console.log("RAW EXACT:", JSON.stringify(body));
       });
     }
 
-    // ❌ validasi amount
     if (parseFloat(paidAmount.value) !== data.amount) {
       return res.json({
         responseCode: "4002500",
@@ -72,7 +74,7 @@ console.log("RAW EXACT:", JSON.stringify(body));
       });
     }
 
-    // ✅ update status
+    // ✅ update
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
@@ -82,6 +84,7 @@ console.log("RAW EXACT:", JSON.stringify(body));
       responseCode: "2002500",
       responseMessage: "Successful",
     });
+
   } catch (error) {
     console.error("PAYMENT ERROR:", error);
 
