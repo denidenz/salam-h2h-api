@@ -14,10 +14,12 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ✅ BI-SNAP FORMAT (TANPA |)
     const data = `${clientKey}|${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(data);
+    verifier.end();
 
     const isValid = verifier.verify(
       process.env.BSI_PUBLIC_KEY,
