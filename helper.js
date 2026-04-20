@@ -2,30 +2,32 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
-    // ambil dari header
+    // ambil header
     const signature =
       req.headers["x-signature"] || req.headers["bpi-signature"];
 
-    const clientKey =
-      req.headers["x-client-key"] ||
-      req.headers["bpi-partner-id"];
-
     const timestamp =
-      req.headers["x-timestamp"] ||
-      req.headers["bpi-timestamp"];
+      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
 
+    const clientKey =
+      req.headers["x-client-key"] || req.headers["bpi-partner-id"];
+
+    console.log("===== SIGN DEBUG =====");
     console.log("SIGNATURE:", signature);
     console.log("CLIENT KEY:", clientKey);
     console.log("TIMESTAMP:", timestamp);
 
+    // validasi awal
     if (!signature || !clientKey || !timestamp) {
-      console.log("❌ Header tidak lengkap");
+      console.log("❌ Missing header for signature");
       return false;
     }
 
+    // ✅ FORMAT BSI RSA (PAYMENT)
     const stringToSign = `${clientKey}|${timestamp}`;
     console.log("STRING TO SIGN:", stringToSign);
 
+    // verify RSA
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign, "utf8");
     verifier.end();
@@ -36,12 +38,15 @@ function verifySignature(req) {
       "base64"
     );
 
-    return isValid;
+    console.log("SIGN VALID:", isValid);
 
+    return isValid;
   } catch (err) {
     console.error("VERIFY ERROR:", err);
     return false;
   }
 }
 
-module.exports = verifySignature;
+module.exports = {
+  verifySignature,
+};
