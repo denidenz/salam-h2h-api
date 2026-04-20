@@ -1,5 +1,11 @@
 const crypto = require("crypto");
 
+// 🔥 CLEAN STRING (FIX SPASI)
+function clean(val) {
+  return String(val || "").trim();
+}
+
+// 🔐 HMAC SIGNATURE
 function generateSignature(method, endpoint, body, token, timestamp, secret) {
   const bodyString = JSON.stringify(body);
 
@@ -17,4 +23,4 @@ function generateSignature(method, endpoint, body, token, timestamp, secret) {
     .digest("base64");
 }
 
-module.exports = { generateSignature };
+module.exports = { generateSignature, clean };
