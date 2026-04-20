@@ -48,6 +48,7 @@ module.exports = async (req, res) => {
     }
 
     console.log("PAYMENT CUSTOMER:", cleanCustomerNo);
+    console.log("FINAL RESPONSE: SUCCESS");
 
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
