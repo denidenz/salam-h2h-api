@@ -22,6 +22,8 @@ function verifySignature(req) {
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
     console.log("BODY:", body);
+    console.log("RAW BODY EXACT:", body);
+    console.log("RAW BODY HEX:", Buffer.from(body).toString("hex"));
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
