@@ -5,19 +5,28 @@ module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
 
-    // 🔥 DEBUG HEADER & BODY
+    // 🔍 DEBUG
     console.log("ALL HEADERS FULL:", JSON.stringify(req.headers, null, 2));
     console.log("PAYMENT BODY:", JSON.stringify(req.body, null, 2));
 
-    // 🔥 NORMALIZE HEADER (ANTI CASE ISSUE)
+    // 🔥 NORMALIZE HEADER
     const headers = {};
     Object.keys(req.headers).forEach(key => {
       headers[key.toLowerCase()] = req.headers[key];
     });
 
-    const signature = headers["x-signature"];
-    const clientKey = headers["x-client-key"];
-    const timestamp = headers["x-timestamp"];
+    // 🔥 SUPPORT BSI (BPI HEADER)
+    const signature =
+      headers["x-signature"] ||
+      headers["bpi-signature"];
+
+    const clientKey =
+      headers["x-client-key"] ||
+      headers["bpi-partner-id"];
+
+    const timestamp =
+      headers["x-timestamp"] ||
+      headers["bpi-timestamp"];
 
     console.log("PARSED HEADERS:", {
       signature,
@@ -25,7 +34,7 @@ module.exports = async (req, res) => {
       timestamp
     });
 
-    // ❌ JANGAN PAKAI res.status → bikin RC30
+    // ❌ VALIDASI HEADER
     if (!signature || !clientKey || !timestamp) {
       console.log("❌ HEADER TIDAK LENGKAP");
 
@@ -57,7 +66,7 @@ module.exports = async (req, res) => {
     const inquiryRequestId = req.body.inquiryRequestId;
     const paidAmount = req.body.paidAmount;
 
-    // 🔥 NORMALISASI VA (ANTI DOUBLE PREFIX)
+    // 🔥 NORMALISASI VA
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -79,7 +88,7 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // 🔁 CEK SUDAH BAYAR
+    // 🔁 SUDAH BAYAR
     if (data.status === "PAID") {
       return res.json({
         responseCode: "2002500",
