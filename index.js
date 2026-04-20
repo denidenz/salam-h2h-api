@@ -2,11 +2,13 @@ const express = require('express');
 const app = express();
 
 // ✅ HANYA INI (JANGAN DUPLIKAT)
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
-  }
-}));
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString("utf8"); // 🔥 WAJIB
+    },
+  })
+);
 
 // 🔥 ROUTES
 const auth = require('./h2h/auth');
