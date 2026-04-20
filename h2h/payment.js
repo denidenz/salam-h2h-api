@@ -1,24 +1,26 @@
-const crypto = require("crypto");
-const db = require('./firebase')
+const db = require('../firebase');
+const { verifySignature } = require('../helper');
 
 module.exports = async (req, res) => {
   try {
+    // 🔐 HEADER
     const signature = req.headers["x-signature"];
     const clientKey = req.headers["x-client-key"];
     const timestamp = req.headers["x-timestamp"];
 
-    const data = `${clientKey}|${timestamp}`;
+    // 🔐 VERIFY SIGNATURE (aktifkan saat SIT)
+    const isProduction = true;
 
-    const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(data);
+    let isValid = true;
 
-    const isValid = verifier.verify(
-      process.env.BSI_PUBLIC_KEY,
-      signature,
-      "base64"
-    );
-
-    console.log("PAYMENT VALID:", isValid);
+    if (isProduction) {
+      isValid = verifySignature({
+        clientKey,
+        timestamp,
+        signature,
+        publicKey: process.env.BSI_PUBLIC_KEY
+      });
+    }
 
     if (!isValid) {
       return res.json({
@@ -27,26 +29,59 @@ module.exports = async (req, res) => {
       });
     }
 
-    const { inquiryRequestId } = req.body;
+    // 🔥 BODY
+    const {
+      virtualAccountNo,
+      inquiryRequestId,
+      paidAmount
+    } = req.body;
 
-    // 🔥 UPDATE FIREBASE
-    await db.collection("transactions")
-      .doc(inquiryRequestId)
-      .update({
-        status: "PAID",
-        paidAt: new Date()
+    // 🔍 CEK TRANSAKSI
+    const docRef = db.collection("transactions").doc(inquiryRequestId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return res.json({
+        responseCode: "4042500",
+        responseMessage: "Transaction Not Found"
       });
+    }
+
+    const data = doc.data();
+
+    // 🔁 IDEMPOTENT (hindari double payment)
+    if (data.status === "PAID") {
+      return res.json({
+        responseCode: "2002500",
+        responseMessage: "Already Paid"
+      });
+    }
+
+    // 💰 VALIDASI AMOUNT (optional tapi disarankan)
+    if (parseFloat(paidAmount.value) !== data.amount) {
+      return res.json({
+        responseCode: "4002500",
+        responseMessage: "Invalid Amount"
+      });
+    }
+
+    // 🔥 UPDATE FIRESTORE
+    await docRef.update({
+      status: "PAID",
+      paidAt: new Date()
+    });
 
     return res.json({
       responseCode: "2002500",
-      responseMessage: "Payment Success"
+      responseMessage: "Successful"
     });
 
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("PAYMENT ERROR:", error);
+
     return res.json({
       responseCode: "5002500",
-      responseMessage: "Payment Error"
+      responseMessage: error.message
     });
   }
 };
