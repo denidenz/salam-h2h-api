@@ -1,9 +1,7 @@
 const crypto = require("crypto");
 
-function verifySignature({ clientKey, timestamp, signature, publicKey, body }) {
+function verifySignature({ clientKey, timestamp, signature, publicKey }) {
   try {
-    const payload = JSON.stringify(body);
-
     const data = `${clientKey}|${timestamp}`;
 
     const verifier = crypto.createVerify("RSA-SHA256");
