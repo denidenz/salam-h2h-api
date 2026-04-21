@@ -1,45 +1,47 @@
 const crypto = require("crypto");
 
+// helper bersihin string
+function clean(value) {
+  return (value || "").toString().trim();
+}
+
 function verifySignature(req) {
   try {
+    // 🔥 BYPASS SANDBOX
     if (process.env.IS_SANDBOX === "true") {
       console.log("⚠️ SANDBOX MODE - BYPASS SIGNATURE");
       return true;
     }
 
-    const signature =
-      (req.headers["x-signature"] || "").trim();
+    // 🔹 HEADER
+    const signature = clean(req.headers["x-signature"]);
+    const timestamp = clean(req.headers["x-timestamp"]);
+    const accessToken = clean(
+      (req.headers["authorization"] || "").replace("Bearer ", "")
+    );
 
-    const timestamp =
-      (req.headers["x-timestamp"] || "").trim();
-
-    const accessToken =
-      (req.headers["authorization"] || "")
-        .replace("Bearer ", "")
-        .trim();
+    // 🔥 WAJIB PATH dari BSI
+    const endpoint = clean(req.headers["endpoint-url"]).split("?")[0];
 
     const method = req.method.toUpperCase();
 
-    // 🔥 WAJIB PATH ONLY
-    const endpoint =
-      (req.headers["endpoint-url"] ||
-        req.originalUrl ||
-        req.url ||
-        "")
-        .split("?")[0]
-        .trim();
+    // 🔥 RAW BODY (STRING)
+    const rawBody = req.rawBody;
 
-    const body = req.rawBody;
+    console.log("===== SIGN DEBUG FINAL =====");
+    console.log("SIGNATURE:", signature);
+    console.log("TIMESTAMP:", timestamp);
+    console.log("TOKEN:", accessToken);
+    console.log("ENDPOINT:", endpoint);
+    console.log("RAW BODY:", rawBody);
 
-    console.log("===== SIGN DEBUG BSI =====");
-
-    if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ Missing header");
+    if (!signature || !timestamp || !accessToken || !endpoint || !rawBody) {
+      console.log("❌ Missing required data");
       return false;
     }
 
-    // 🔥 STEP 1: MINIFY BODY (WAJIB)
-    const minifyBody = JSON.stringify(JSON.parse(body));
+    // 🔥 STEP 1: MINIFY BODY
+    const minifyBody = JSON.stringify(JSON.parse(rawBody));
 
     // 🔥 STEP 2: SHA256 → HEX → LOWERCASE
     const bodyHash = crypto
@@ -50,13 +52,13 @@ function verifySignature(req) {
 
     console.log("BODY HASH:", bodyHash);
 
-    // 🔥 STEP 3: STRING TO SIGN
+    // 🔥 STEP 3: STRING TO SIGN (FIXED FORMAT BSI)
     const stringToSign =
       `${method}:${endpoint}:${accessToken}:${bodyHash}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
 
-    // 🔐 CLIENT SECRET (BUKAN PUBLIC KEY)
+    // 🔐 CLIENT SECRET (FIX ENV NAME)
     const clientSecret = process.env.BSI_CLIENT_SECRET;
 
     if (!clientSecret) {
@@ -64,7 +66,9 @@ function verifySignature(req) {
       return false;
     }
 
-    // 🔥 STEP 4: HMAC SHA512
+    console.log("CLIENT SECRET: ADA ✅");
+
+    // 🔥 STEP 4: HMAC SHA512 → BASE64
     const expectedSignature = crypto
       .createHmac("sha512", clientSecret)
       .update(stringToSign)
@@ -73,7 +77,11 @@ function verifySignature(req) {
     console.log("EXPECTED:", expectedSignature);
     console.log("RECEIVED:", signature);
 
-    return expectedSignature === signature;
+    const isValid = expectedSignature === signature;
+
+    console.log("MATCH:", isValid ? "✅ VALID" : "❌ INVALID");
+
+    return isValid;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -81,4 +89,6 @@ function verifySignature(req) {
   }
 }
 
-module.exports = { verifySignature };
+module.exports = {
+  verifySignature,
+};
