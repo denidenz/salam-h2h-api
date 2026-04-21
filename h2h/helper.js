@@ -2,13 +2,12 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
-    // 🔥 BYPASS UNTUK SANDBOX
+    // 🔥 BYPASS SANDBOX
     if (process.env.IS_SANDBOX === "true") {
       console.log("⚠️ SANDBOX MODE - BYPASS SIGNATURE");
       return true;
     }
 
-    // 🔹 Ambil header
     const signature =
       (req.headers["x-signature"] || req.headers["bpi-signature"] || "").trim();
 
@@ -21,65 +20,43 @@ function verifySignature(req) {
         "").trim();
 
     const method = req.method.toUpperCase();
+    const endpoint =
+      (req.headers["endpoint-url"] || req.originalUrl || req.url || "").split("?")[0].trim();
 
-    // 🔥 RAW BODY WAJIB
     const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG AUTO =====");
-    console.log("SIGNATURE:", signature);
-    console.log("TIMESTAMP:", timestamp);
-    console.log("TOKEN:", accessToken);
+    console.log("===== SIGN DEBUG HASH MODE =====");
     console.log("BODY:", body);
 
     if (!signature || !timestamp || !accessToken || !body) {
-      console.log("❌ Missing required data");
       return false;
     }
 
-    // 🔐 PUBLIC KEY
+    // 🔥 HASH BODY (INI KUNCI UTAMA)
+    const bodyHash = crypto
+      .createHash("sha256")
+      .update(body)
+      .digest("hex");
+
+    console.log("BODY HASH:", bodyHash);
+
+    // 🔥 FORMAT BARU
+    const stringToSign =
+      `${method}:${endpoint}:${bodyHash}:${accessToken}:${timestamp}`;
+
+    console.log("STRING TO SIGN:", stringToSign);
+
     const publicKey = process.env.BSI_PUBLIC_KEY?.replace(/\\n/g, "\n");
 
-    if (!publicKey) {
-      console.log("❌ PUBLIC KEY NOT FOUND");
-      return false;
-    }
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(stringToSign);
+    verifier.end();
 
-    console.log("PUBLIC KEY LOADED");
+    const isValid = verifier.verify(publicKey, signature, "base64");
 
-    // 🔥 LIST ENDPOINT YANG DICOBA
-    const endpointsToTry = [
-      req.headers["endpoint-url"],
-      req.originalUrl,
-      req.url,
-      "/inquiry",
-      "/payment",
-      "/bpi/inquiry",
-      "/bpi/payment"
-    ].filter(Boolean);
+    console.log("VERIFY RESULT:", isValid);
 
-    // 🔥 LOOP CHECK
-    for (const ep of endpointsToTry) {
-      const cleanEndpoint = ep.split("?")[0].trim();
-
-      const stringToSign =
-        `${method}:${cleanEndpoint}:${body}:${accessToken}:${timestamp}`;
-
-      const verifier = crypto.createVerify("RSA-SHA256");
-      verifier.update(stringToSign);
-      verifier.end();
-
-      const isValid = verifier.verify(publicKey, signature, "base64");
-
-      console.log("TRY ENDPOINT:", cleanEndpoint, "=>", isValid);
-
-      if (isValid) {
-        console.log("✅ SIGNATURE VALID DENGAN ENDPOINT:", cleanEndpoint);
-        return true;
-      }
-    }
-
-    console.log("❌ SIGNATURE TIDAK VALID DI SEMUA ENDPOINT");
-    return false;
+    return isValid;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
@@ -87,6 +64,4 @@ function verifySignature(req) {
   }
 }
 
-module.exports = {
-  verifySignature,
-};
+module.exports = { verifySignature };
