@@ -2,7 +2,6 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
-    // 🔥 BYPASS SANDBOX
     if (process.env.IS_SANDBOX === "true") {
       console.log("⚠️ SANDBOX MODE - BYPASS SIGNATURE");
       return true;
@@ -20,27 +19,28 @@ function verifySignature(req) {
         "").trim();
 
     const method = req.method.toUpperCase();
+
     const endpoint =
-      (req.headers["endpoint-url"] || req.originalUrl || req.url || "").split("?")[0].trim();
+      (req.headers["endpoint-url"] || req.originalUrl || req.url || "")
+        .split("?")[0]
+        .trim();
 
     const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG HASH MODE =====");
-    console.log("BODY:", body);
+    console.log("===== SIGN DEBUG FINAL (BASE64 HASH) =====");
 
     if (!signature || !timestamp || !accessToken || !body) {
       return false;
     }
 
-    // 🔥 HASH BODY (INI KUNCI UTAMA)
+    // 🔥 HASH BASE64 (INI FIX UTAMA)
     const bodyHash = crypto
       .createHash("sha256")
       .update(body)
-      .digest("hex");
+      .digest("base64");
 
-    console.log("BODY HASH:", bodyHash);
+    console.log("BODY HASH (BASE64):", bodyHash);
 
-    // 🔥 FORMAT BARU
     const stringToSign =
       `${method}:${endpoint}:${bodyHash}:${accessToken}:${timestamp}`;
 
