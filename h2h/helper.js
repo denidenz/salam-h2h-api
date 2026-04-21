@@ -8,55 +8,72 @@ function verifySignature(req) {
     }
 
     const signature =
-      (req.headers["x-signature"] || req.headers["bpi-signature"] || "").trim();
+      (req.headers["x-signature"] || "").trim();
 
     const timestamp =
-      (req.headers["x-timestamp"] || req.headers["bpi-timestamp"] || "").trim();
+      (req.headers["x-timestamp"] || "").trim();
 
     const accessToken =
-      (req.headers["authorization"]?.replace("Bearer ", "") ||
-        req.headers["bpi-authorization"]?.replace("Bearer ", "") ||
-        "").trim();
+      (req.headers["authorization"] || "")
+        .replace("Bearer ", "")
+        .trim();
 
     const method = req.method.toUpperCase();
 
+    // 🔥 WAJIB PATH ONLY
     const endpoint =
-      (req.headers["endpoint-url"] || req.originalUrl || req.url || "")
+      (req.headers["endpoint-url"] ||
+        req.originalUrl ||
+        req.url ||
+        "")
         .split("?")[0]
         .trim();
 
     const body = req.rawBody;
 
-    console.log("===== SIGN DEBUG FINAL (BASE64 HASH) =====");
+    console.log("===== SIGN DEBUG BSI =====");
 
     if (!signature || !timestamp || !accessToken || !body) {
+      console.log("❌ Missing header");
       return false;
     }
 
-    // 🔥 HASH BASE64 (INI FIX UTAMA)
+    // 🔥 STEP 1: MINIFY BODY (WAJIB)
+    const minifyBody = JSON.stringify(JSON.parse(body));
+
+    // 🔥 STEP 2: SHA256 → HEX → LOWERCASE
     const bodyHash = crypto
       .createHash("sha256")
-      .update(body)
-      .digest("base64");
+      .update(minifyBody)
+      .digest("hex")
+      .toLowerCase();
 
-    console.log("BODY HASH (BASE64):", bodyHash);
+    console.log("BODY HASH:", bodyHash);
 
+    // 🔥 STEP 3: STRING TO SIGN
     const stringToSign =
-      `${method}:${endpoint}:${bodyHash}:${accessToken}:${timestamp}`;
+      `${method}:${endpoint}:${accessToken}:${bodyHash}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
 
-    const publicKey = process.env.BSI_PUBLIC_KEY?.replace(/\\n/g, "\n");
+    // 🔐 CLIENT SECRET (BUKAN PUBLIC KEY)
+    const clientSecret = process.env.BSI_CLIENT_SECRET;
 
-    const verifier = crypto.createVerify("RSA-SHA256");
-    verifier.update(stringToSign);
-    verifier.end();
+    if (!clientSecret) {
+      console.log("❌ CLIENT SECRET NOT FOUND");
+      return false;
+    }
 
-    const isValid = verifier.verify(publicKey, signature, "base64");
+    // 🔥 STEP 4: HMAC SHA512
+    const expectedSignature = crypto
+      .createHmac("sha512", clientSecret)
+      .update(stringToSign)
+      .digest("base64");
 
-    console.log("VERIFY RESULT:", isValid);
+    console.log("EXPECTED:", expectedSignature);
+    console.log("RECEIVED:", signature);
 
-    return isValid;
+    return expectedSignature === signature;
 
   } catch (err) {
     console.error("VERIFY ERROR:", err);
