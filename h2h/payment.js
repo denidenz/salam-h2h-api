@@ -1,7 +1,6 @@
 const db = require("./firebase");
 const { verifySignature } = require("./helper");
 
-// helper bersihin input (ANTI SPASI BSI)
 function clean(value) {
   return (value || "").toString().trim();
 }
@@ -9,16 +8,6 @@ function clean(value) {
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
-
-    // 🔥 SIMULASI DB DOWN (UNTUK SIT)
-    if (process.env.SIMULATE_DB_DOWN === "true") {
-      console.log("⚠️ SIMULATE DB DOWN");
-
-      return res.status(500).json({
-        responseCode: "5002500",
-        responseMessage: "General Error",
-      });
-    }
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
@@ -30,9 +19,18 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔥 CLEAN INPUT (WAJIB)
+    // 🔥 SIMULASI (OPTIONAL - OFF DI PROD)
+    if (process.env.SIMULATE_DB_DOWN === "true") {
+      return res.status(500).json({
+        responseCode: "5002500",
+        responseMessage: "General Error",
+      });
+    }
+
+    // 🔥 CLEAN INPUT
     const virtualAccountNo = clean(req.body.virtualAccountNo);
     const paymentRequestId = clean(req.body.paymentRequestId);
+    const partnerServiceId = clean(req.body.partnerServiceId);
     const paidAmount = req.body.paidAmount;
 
     console.log("VA CLEAN:", virtualAccountNo);
@@ -45,15 +43,23 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ VALIDASI PARTNER
+    if (partnerServiceId !== "1754") {
+      return res.status(404).json({
+        responseCode: "4042511",
+        responseMessage: "Invalid data",
+      });
+    }
+
     // ❌ VALIDASI FORMAT VA
-    if (!/^\d+$/.test(virtualAccountNo)) {
+    if (!/^\d+$/.test(virtualAccountNo) || virtualAccountNo.length < 8) {
       return res.status(404).json({
         responseCode: "4042519",
         responseMessage: "Invalid Bill number format",
       });
     }
 
-    // 🔧 NORMALISASI VA → customerNo
+    // 🔧 NORMALISASI VA
     let customerNo = virtualAccountNo;
 
     while (customerNo.startsWith("1754")) {
@@ -64,11 +70,10 @@ module.exports = async (req, res) => {
 
     console.log("CUSTOMER:", customerNo);
 
-    // 🔍 AMBIL DATA FIRESTORE
+    // 🔍 FIRESTORE
     const docRef = db.collection("transactions").doc(customerNo);
     const doc = await docRef.get();
 
-    // ❌ BILL NOT FOUND
     if (!doc.exists) {
       return res.status(404).json({
         responseCode: "4042512",
@@ -78,7 +83,6 @@ module.exports = async (req, res) => {
 
     const data = doc.data();
 
-    // ❌ SUDAH DIBAYAR
     if (data.status === "PAID") {
       return res.status(404).json({
         responseCode: "4042514",
@@ -86,26 +90,26 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ INVALID DATA (INQUIRY TIDAK MATCH)
-    if (
-      process.env.IS_SANDBOX !== "true" &&
-      data.lastInquiryId !== paymentRequestId
-    ) {
+    // ❌ VALIDASI INQUIRY
+    if (data.lastInquiryId !== paymentRequestId) {
       return res.status(404).json({
         responseCode: "4042511",
         responseMessage: "Invalid data",
       });
     }
 
-    // ❌ INVALID AMOUNT
-    if (parseFloat(paidAmount.value) !== data.amount) {
+    // ❌ VALIDASI AMOUNT
+    const paid = Number(paidAmount.value || 0);
+    const amount = Number(data.amount || 0);
+
+    if (paid !== amount) {
       return res.status(404).json({
         responseCode: "4042513",
         responseMessage: "Payment Amount not valid",
       });
     }
 
-    // ✅ SUCCESS → UPDATE DB
+    // ✅ SUCCESS
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
@@ -116,7 +120,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       responseCode: "2002500",
-      responseMessage: "Success",
+      responseMessage: "Successful",
     });
 
   } catch (error) {
