@@ -2,11 +2,13 @@ const express = require('express');
 const app = express();
 
 // ✅ HANYA INI (JANGAN DUPLIKAT)
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString("utf8");
-  }
-}));
+app.use(
+  require("body-parser").json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString();
+    },
+  })
+);
 // 🔥 ROUTES
 const auth = require('./h2h/auth');
 const inquiry = require('./h2h/inquiry');
