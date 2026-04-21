@@ -1,9 +1,24 @@
 const db = require("./firebase");
 const { verifySignature } = require("./helper");
 
+// helper bersihin input (ANTI SPASI BSI)
+function clean(value) {
+  return (value || "").toString().trim();
+}
+
 module.exports = async (req, res) => {
   try {
     console.log("===== PAYMENT HIT =====");
+
+    // 🔥 SIMULASI DB DOWN (UNTUK SIT)
+    if (process.env.SIMULATE_DB_DOWN === "true") {
+      console.log("⚠️ SIMULATE DB DOWN");
+
+      return res.status(500).json({
+        responseCode: "5002500",
+        responseMessage: "General Error",
+      });
+    }
 
     // 🔐 VALIDASI SIGNATURE
     const isValid = verifySignature(req);
@@ -15,11 +30,12 @@ module.exports = async (req, res) => {
       });
     }
 
-    const {
-      virtualAccountNo,
-      paymentRequestId,
-      paidAmount,
-    } = req.body;
+    // 🔥 CLEAN INPUT (WAJIB)
+    const virtualAccountNo = clean(req.body.virtualAccountNo);
+    const paymentRequestId = clean(req.body.paymentRequestId);
+    const paidAmount = req.body.paidAmount;
+
+    console.log("VA CLEAN:", virtualAccountNo);
 
     // ❌ VALIDASI FIELD
     if (!virtualAccountNo || !paymentRequestId || !paidAmount?.value) {
@@ -37,16 +53,18 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 🔧 NORMALISASI VA
-    let customerNo = virtualAccountNo.trim();
+    // 🔧 NORMALISASI VA → customerNo
+    let customerNo = virtualAccountNo;
 
     while (customerNo.startsWith("1754")) {
       customerNo = customerNo.substring(4);
     }
 
+    customerNo = customerNo.trim();
+
     console.log("CUSTOMER:", customerNo);
 
-    // 🔍 AMBIL DATA
+    // 🔍 AMBIL DATA FIRESTORE
     const docRef = db.collection("transactions").doc(customerNo);
     const doc = await docRef.get();
 
@@ -68,7 +86,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ INVALID DATA (INQUIRY TIDAK SESUAI)
+    // ❌ INVALID DATA (INQUIRY TIDAK MATCH)
     if (
       process.env.IS_SANDBOX !== "true" &&
       data.lastInquiryId !== paymentRequestId
@@ -87,7 +105,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ✅ SUCCESS → UPDATE
+    // ✅ SUCCESS → UPDATE DB
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
