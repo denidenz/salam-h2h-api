@@ -2,49 +2,58 @@ const crypto = require("crypto");
 
 function verifySignature(req) {
   try {
-    // 🔥 BYPASS UNTUK SANDBOX / SIT
+    // 🔥 BYPASS UNTUK SIT SAJA
     if (process.env.IS_SANDBOX === "true") {
       console.log("⚠️ SANDBOX MODE - BYPASS SIGNATURE");
       return true;
     }
 
-    // 🔹 Ambil header
+    // 🔹 Ambil header + trim
     const signature =
-      req.headers["x-signature"] || req.headers["bpi-signature"];
+      (req.headers["x-signature"] || req.headers["bpi-signature"] || "").trim();
 
     const timestamp =
-      req.headers["x-timestamp"] || req.headers["bpi-timestamp"];
+      (req.headers["x-timestamp"] || req.headers["bpi-timestamp"] || "").trim();
 
     const accessToken =
-      req.headers["authorization"]?.replace("Bearer ", "") ||
-      req.headers["bpi-authorization"]?.replace("Bearer ", "");
+      (req.headers["authorization"]?.replace("Bearer ", "") ||
+        req.headers["bpi-authorization"]?.replace("Bearer ", "") ||
+        "").trim();
 
-    const method = req.method.toUpperCase(); // POST
-    const endpoint = "/payment";
+    const method = req.method.toUpperCase();
 
-    // 🔥 WAJIB raw body asli (string, bukan object)
-    const body = req.rawBody;
+    // 🔥 ENDPOINT DINAMIS (WAJIB)
+    const endpoint =
+      req.headers["endpoint-url"] ||
+      req.originalUrl ||
+      req.url;
 
-    console.log("===== SIGN DEBUG =====");
+    // 🔥 RAW BODY EXACT
+    const body =
+      typeof req.rawBody === "string"
+        ? req.rawBody
+        : JSON.stringify(req.body);
+
+    console.log("===== SIGN DEBUG FINAL =====");
     console.log("SIGNATURE:", signature);
     console.log("TIMESTAMP:", timestamp);
     console.log("TOKEN:", accessToken);
+    console.log("ENDPOINT:", endpoint);
     console.log("BODY:", body);
-    console.log("IS_SANDBOX:", process.env.IS_SANDBOX);
+    console.log("BODY HEX:", Buffer.from(body).toString("hex"));
 
     if (!signature || !timestamp || !accessToken || !body) {
       console.log("❌ Missing required data");
       return false;
     }
 
-    // 🔥 FORMAT RESMI BSI
+    // 🔥 FORMAT BSI
     const stringToSign =
       `${method}:${endpoint}:${body}:${accessToken}:${timestamp}`;
 
     console.log("STRING TO SIGN:", stringToSign);
-    console.log("BODY LENGTH:", body.length);
 
-    // 🔐 Ambil public key dari ENV
+    // 🔐 PUBLIC KEY
     const publicKey = process.env.BSI_PUBLIC_KEY?.replace(/\\n/g, "\n");
 
     if (!publicKey) {
@@ -52,18 +61,12 @@ function verifySignature(req) {
       return false;
     }
 
-    console.log("PUBLIC KEY LOADED");
-
-    // 🔐 VERIFY RSA SHA256
+    // 🔐 VERIFY
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(stringToSign);
     verifier.end();
 
-    const isValid = verifier.verify(
-      publicKey,
-      signature,
-      "base64"
-    );
+    const isValid = verifier.verify(publicKey, signature, "base64");
 
     console.log("VERIFY RESULT:", isValid);
 
