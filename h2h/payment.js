@@ -21,8 +21,24 @@ module.exports = async (req, res) => {
       paidAmount,
     } = req.body;
 
-    // 🔧 bersihkan VA
-    let customerNo = virtualAccountNo?.trim();
+    // ❌ VALIDASI FIELD
+    if (!virtualAccountNo || !paymentRequestId || !paidAmount?.value) {
+      return res.status(400).json({
+        responseCode: "4002502",
+        responseMessage: "Field is not exists",
+      });
+    }
+
+    // ❌ VALIDASI FORMAT VA
+    if (!/^\d+$/.test(virtualAccountNo)) {
+      return res.status(404).json({
+        responseCode: "4042519",
+        responseMessage: "Invalid Bill number format",
+      });
+    }
+
+    // 🔧 NORMALISASI VA
+    let customerNo = virtualAccountNo.trim();
 
     while (customerNo.startsWith("1754")) {
       customerNo = customerNo.substring(4);
@@ -30,13 +46,13 @@ module.exports = async (req, res) => {
 
     console.log("CUSTOMER:", customerNo);
 
-    // 🔍 ambil data
+    // 🔍 AMBIL DATA
     const docRef = db.collection("transactions").doc(customerNo);
     const doc = await docRef.get();
 
     // ❌ BILL NOT FOUND
     if (!doc.exists) {
-      return res.json({
+      return res.status(404).json({
         responseCode: "4042512",
         responseMessage: "Bill not found",
       });
@@ -46,18 +62,18 @@ module.exports = async (req, res) => {
 
     // ❌ SUDAH DIBAYAR
     if (data.status === "PAID") {
-      return res.json({
+      return res.status(404).json({
         responseCode: "4042514",
         responseMessage: "Bill already paid",
       });
     }
 
-    // ❌ INVALID INQUIRY (pakai INVALID DATA)
+    // ❌ INVALID DATA (INQUIRY TIDAK SESUAI)
     if (
       process.env.IS_SANDBOX !== "true" &&
       data.lastInquiryId !== paymentRequestId
     ) {
-      return res.json({
+      return res.status(404).json({
         responseCode: "4042511",
         responseMessage: "Invalid data",
       });
@@ -65,19 +81,22 @@ module.exports = async (req, res) => {
 
     // ❌ INVALID AMOUNT
     if (parseFloat(paidAmount.value) !== data.amount) {
-      return res.json({
+      return res.status(404).json({
         responseCode: "4042513",
         responseMessage: "Payment Amount not valid",
       });
     }
 
-    // ✅ SUCCESS
+    // ✅ SUCCESS → UPDATE
     await docRef.update({
       status: "PAID",
       paidAt: new Date(),
+      paymentRequestId,
     });
 
-    return res.json({
+    console.log("PAYMENT SUCCESS:", customerNo);
+
+    return res.status(200).json({
       responseCode: "2002500",
       responseMessage: "Success",
     });
