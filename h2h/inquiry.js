@@ -7,58 +7,88 @@ function getExpiredTime() {
 
 module.exports = async (req, res) => {
   try {
+    console.log("===== INQUIRY HIT =====");
     console.log("REQ BODY:", req.body);
 
-    const virtualAccountNo = req.body.virtualAccountNo?.trim();
-    const partnerServiceId = req.body.partnerServiceId?.trim();
-    const inquiryRequestId = req.body.inquiryRequestId;
+    const {
+      virtualAccountNo,
+      partnerServiceId,
+      inquiryRequestId
+    } = req.body;
 
-    console.log("VA DARI BSI:", virtualAccountNo);
+    // ❌ VALIDASI FIELD
+    if (!virtualAccountNo || !partnerServiceId || !inquiryRequestId) {
+      return res.status(400).json({
+        responseCode: "4002402",
+        responseMessage: "Field is not exists"
+      });
+    }
+
+    // ❌ FORMAT VA (harus angka)
+    if (!/^\d+$/.test(virtualAccountNo)) {
+      return res.status(400).json({
+        responseCode: "4042419",
+        responseMessage: "Invalid Bill number format"
+      });
+    }
 
     // 🔥 NORMALISASI VA
     let cleanCustomerNo = virtualAccountNo;
-
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
-    console.log("FIXED CUSTOMER:", cleanCustomerNo);
-
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
-    // ❌ BILL NOT FOUND
+    // ❌ NOT FOUND
     if (!doc.exists) {
-      return res.json({
-        responseCode: "4042512",
+      return res.status(404).json({
+        responseCode: "4042412",
         responseMessage: "Bill not found"
       });
     }
 
     const data = doc.data();
 
-    // ❌ SUDAH TIDAK BISA DIBAYAR
+    // ❌ SUDAH DIBAYAR
+    if (data.status === "PAID") {
+      return res.status(404).json({
+        responseCode: "4042414",
+        responseMessage: "Bill already paid"
+      });
+    }
+
+    // ❌ EXPIRED (optional kalau mau pakai expiredAt)
+    if (data.expiredAt && new Date() > new Date(data.expiredAt)) {
+      return res.status(404).json({
+        responseCode: "4042420",
+        responseMessage: "Bill Expired"
+      });
+    }
+
+    // ❌ INVALID DATA
     if (data.status !== "UNPAID") {
-      return res.json({
-        responseCode: "4042511",
+      return res.status(404).json({
+        responseCode: "4042411",
         responseMessage: "Invalid data"
       });
     }
 
-    // simpan inquiry ID
+    // ✅ SIMPAN inquiry ID
     await docRef.update({
       lastInquiryId: inquiryRequestId
     });
 
     // ✅ SUCCESS
-    return res.json({
+    return res.status(200).json({
       responseCode: "2002400",
       responseMessage: "Success",
       virtualAccountData: {
         partnerServiceId,
         customerNo: cleanCustomerNo,
         virtualAccountNo,
-        virtualAccountName: data.name || "CUSTOMER",
+        virtualAccountName: (data.name || "CUSTOMER").toUpperCase(),
         inquiryRequestId,
 
         totalAmount: {
@@ -87,8 +117,8 @@ module.exports = async (req, res) => {
   } catch (error) {
     console.error("INQUIRY ERROR:", error);
 
-    return res.json({
-      responseCode: "5002500",
+    return res.status(500).json({
+      responseCode: "5002400",
       responseMessage: "General Error"
     });
   }
