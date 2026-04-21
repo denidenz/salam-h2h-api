@@ -1,51 +1,76 @@
-const db = require('./firebase');
+const db = require("./firebase");
+const { verifySignature } = require("./helper");
+
+// helper bersihin input (ANTI BUG BSI)
+function clean(value) {
+  return (value || "").toString().trim();
+}
 
 function getExpiredTime() {
   const date = new Date(Date.now() + 60 * 60 * 1000);
-  return date.toISOString().replace('Z', '+07:00');
+  return date.toISOString().replace("Z", "+07:00");
 }
 
 module.exports = async (req, res) => {
   try {
     console.log("===== INQUIRY HIT =====");
+
+    // 🔐 VALIDASI SIGNATURE
+    const isValid = verifySignature(req);
+
+    if (!isValid) {
+      return res.status(401).json({
+        responseCode: "4012400",
+        responseMessage: "Unauthorized Access",
+      });
+    }
+
     console.log("REQ BODY:", req.body);
 
-    const {
-      virtualAccountNo,
-      partnerServiceId,
-      inquiryRequestId
-    } = req.body;
+    // 🔥 CLEAN INPUT (WAJIB - BSI SERING ADA SPASI)
+    const virtualAccountNo = clean(req.body.virtualAccountNo);
+    const partnerServiceId = clean(req.body.partnerServiceId);
+    const inquiryRequestId = clean(req.body.inquiryRequestId);
+
+    console.log("VA RAW:", req.body.virtualAccountNo);
+    console.log("VA CLEAN:", virtualAccountNo);
 
     // ❌ VALIDASI FIELD
     if (!virtualAccountNo || !partnerServiceId || !inquiryRequestId) {
       return res.status(400).json({
         responseCode: "4002402",
-        responseMessage: "Field is not exists"
+        responseMessage: "Field is not exists",
       });
     }
 
-    // ❌ FORMAT VA (harus angka)
+    // ❌ VALIDASI FORMAT VA
     if (!/^\d+$/.test(virtualAccountNo)) {
-      return res.status(400).json({
+      return res.status(404).json({
         responseCode: "4042419",
-        responseMessage: "Invalid Bill number format"
+        responseMessage: "Invalid Bill number format",
       });
     }
 
-    // 🔥 NORMALISASI VA
+    // 🔧 NORMALISASI VA → ambil customerNo
     let cleanCustomerNo = virtualAccountNo;
+
     while (cleanCustomerNo.startsWith("1754")) {
       cleanCustomerNo = cleanCustomerNo.substring(4);
     }
 
+    cleanCustomerNo = cleanCustomerNo.trim();
+
+    console.log("FINAL CUSTOMER:", cleanCustomerNo);
+
+    // 🔍 AMBIL DATA FIRESTORE
     const docRef = db.collection("transactions").doc(cleanCustomerNo);
     const doc = await docRef.get();
 
-    // ❌ NOT FOUND
+    // ❌ BILL NOT FOUND
     if (!doc.exists) {
       return res.status(404).json({
         responseCode: "4042412",
-        responseMessage: "Bill not found"
+        responseMessage: "Bill not found",
       });
     }
 
@@ -55,15 +80,15 @@ module.exports = async (req, res) => {
     if (data.status === "PAID") {
       return res.status(404).json({
         responseCode: "4042414",
-        responseMessage: "Bill already paid"
+        responseMessage: "Bill already paid",
       });
     }
 
-    // ❌ EXPIRED (optional kalau mau pakai expiredAt)
+    // ❌ EXPIRED (opsional)
     if (data.expiredAt && new Date() > new Date(data.expiredAt)) {
       return res.status(404).json({
         responseCode: "4042420",
-        responseMessage: "Bill Expired"
+        responseMessage: "Bill Expired",
       });
     }
 
@@ -71,13 +96,13 @@ module.exports = async (req, res) => {
     if (data.status !== "UNPAID") {
       return res.status(404).json({
         responseCode: "4042411",
-        responseMessage: "Invalid data"
+        responseMessage: "Invalid data",
       });
     }
 
     // ✅ SIMPAN inquiry ID
     await docRef.update({
-      lastInquiryId: inquiryRequestId
+      lastInquiryId: inquiryRequestId,
     });
 
     // ✅ SUCCESS
@@ -93,7 +118,7 @@ module.exports = async (req, res) => {
 
         totalAmount: {
           value: data.amount.toFixed(2),
-          currency: "IDR"
+          currency: "IDR",
         },
 
         expiredDateTime: getExpiredTime(),
@@ -105,13 +130,13 @@ module.exports = async (req, res) => {
             billName: "Pembayaran",
             billAmount: {
               value: data.amount.toFixed(2),
-              currency: "IDR"
-            }
-          }
+              currency: "IDR",
+            },
+          },
         ],
 
-        additionalInfo: {}
-      }
+        additionalInfo: {},
+      },
     });
 
   } catch (error) {
@@ -119,7 +144,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       responseCode: "5002400",
-      responseMessage: "General Error"
+      responseMessage: "General Error",
     });
   }
 };
