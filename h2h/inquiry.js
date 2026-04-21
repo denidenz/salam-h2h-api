@@ -6,26 +6,20 @@ function clean(value) {
   return (value || "").toString().trim();
 }
 
+function formatDate(date) {
+  return new Date(date).toISOString().replace("Z", "+07:00");
+}
+
 function getExpiredTime() {
   const date = new Date(Date.now() + 60 * 60 * 1000);
-  return date.toISOString().replace("Z", "+07:00");
+  return formatDate(date);
 }
 
 module.exports = async (req, res) => {
   try {
     console.log("===== INQUIRY HIT =====");
 
-    // 🔥 SIMULASI DB DOWN
-    if (process.env.SIMULATE_DB_DOWN === "true") {
-      console.log("⚠️ SIMULATE DB DOWN");
-
-      return res.status(500).json({
-        responseCode: "5002400",
-        responseMessage: "General Error",
-      });
-    }
-
-    // 🔐 VALIDASI SIGNATURE
+    // 🔐 VALIDASI SIGNATURE (WAJIB PALING ATAS)
     const isValid = verifySignature(req);
 
     if (!isValid) {
@@ -52,15 +46,23 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ❌ VALIDASI PARTNER
+    if (partnerServiceId !== "1754") {
+      return res.status(404).json({
+        responseCode: "4042411",
+        responseMessage: "Invalid data",
+      });
+    }
+
     // ❌ VALIDASI FORMAT VA
-    if (!/^\d+$/.test(virtualAccountNo)) {
+    if (!/^\d+$/.test(virtualAccountNo) || virtualAccountNo.length < 8) {
       return res.status(404).json({
         responseCode: "4042419",
         responseMessage: "Invalid Bill number format",
       });
     }
 
-    // 🔧 NORMALISASI VA
+    // 🔧 NORMALISASI VA → ambil customerNo
     let cleanCustomerNo = virtualAccountNo;
 
     while (cleanCustomerNo.startsWith("1754")) {
@@ -93,7 +95,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ EXPIRED (opsional tapi bagus)
+    // ❌ EXPIRED
     if (data.expiredAt && new Date() > new Date(data.expiredAt)) {
       return res.status(404).json({
         responseCode: "4042420",
@@ -101,7 +103,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // ❌ INVALID DATA (ANTI EDGE CASE)
+    // ❌ INVALID DATA
     if (data.status !== "UNPAID") {
       return res.status(404).json({
         responseCode: "4042411",
@@ -114,13 +116,12 @@ module.exports = async (req, res) => {
       lastInquiryId: inquiryRequestId,
     });
 
-    // 🔥 FIX KECIL (PENTING)
     const amount = Number(data.amount || 0);
 
     // ✅ SUCCESS
     return res.status(200).json({
       responseCode: "2002400",
-      responseMessage: "Success",
+      responseMessage: "Successful",
       virtualAccountData: {
         partnerServiceId,
         customerNo: cleanCustomerNo,
@@ -133,7 +134,9 @@ module.exports = async (req, res) => {
           currency: "IDR",
         },
 
-        expiredDateTime: getExpiredTime(),
+        expiredDateTime: data.expiredAt
+          ? formatDate(data.expiredAt)
+          : getExpiredTime(),
 
         billDetails: [
           {
